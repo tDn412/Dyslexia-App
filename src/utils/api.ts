@@ -3,6 +3,7 @@
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const AI_API_URL = import.meta.env.VITE_AI_API_URL || 'https://dinhtu4125-dyslexia-backend.hf.space/api';
 
 export interface ApiResponse<T> {
   data?: T;
@@ -28,16 +29,21 @@ const getUserId = (): string | null => {
  */
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  baseUrl: string = API_BASE_URL
 ): Promise<ApiResponse<T>> {
   try {
     const token = getToken();
     const userId = getUserId();
 
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options.headers,
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
     };
+
+    // Set Content-Type to application/json by default, unless it's FormData
+    if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -47,7 +53,7 @@ async function request<T>(
       headers['x-user-id'] = userId;
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${baseUrl}${endpoint}`, {
       ...options,
       headers,
     });
@@ -76,6 +82,74 @@ async function request<T>(
  * API methods
  */
 export const api = {
+  // NLP
+  nlp: {
+    segment: (text: string) =>
+      request<{ normalized: string; sentences: string[]; words_per_sentence: string[][] }>('/segment', {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      }, AI_API_URL),
+  },
+
+  // Text-to-Speech
+  tts: {
+    speak: (text: string) =>
+      request<{ audio_base64: string }>('/tts', {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      }, AI_API_URL),
+  },
+
+  // Pronunciation
+  pronunciation: {
+    check: (referenceText: string, audioFile: Blob) => {
+      const formData = new FormData();
+      formData.append('reference_text', referenceText);
+      formData.append('audio_file', audioFile);
+
+      return request<{ reference_text: string; your_transcript: string; word_scores: { word: string; pronunciation_score: number }[] }>('/check-pronunciation', {
+        method: 'POST',
+        body: formData,
+        headers: {}, // Let browser set Content-Type for FormData
+      }, AI_API_URL);
+    },
+  },
+
+  // OCR
+  ocr: {
+    upload: (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      return request<{ text: string }>('/ocr', {
+        method: 'POST',
+        body: formData,
+        headers: {}, // Let browser set Content-Type for FormData
+      }, AI_API_URL);
+    },
+
+    getFiles: (userId?: string, search?: string) => {
+      const params = new URLSearchParams();
+      if (userId) params.append('userId', userId);
+      if (search) params.append('search', search);
+      return request<any[]>(`/ocr/files?${params.toString()}`);
+    },
+
+    getFile: (id: string, userId?: string) =>
+      request<any>(`/ocr/files/${id}${userId ? `?userId=${userId}` : ''}`),
+
+    updateFile: (id: string, data: { name: string }, userId?: string) =>
+      request<any>(`/ocr/files/${id}${userId ? `?userId=${userId}` : ''}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    deleteFile: (id: string, userId?: string) =>
+      request(`/ocr/files/${id}${userId ? `?userId=${userId}` : ''}`, {
+        method: 'DELETE',
+      }),
+  },
+
   // Auth
   auth: {
     register: (data: { fullName?: string; username: string; email: string; password: string; confirmPassword: string; birthDate?: string }) =>
@@ -174,36 +248,6 @@ export const api = {
 
     getById: (id: string) =>
       request<any>(`/speakings/${id}`),
-  },
-
-  // OCR
-  ocr: {
-    upload: (data: { fileName: string; fileData?: string; fileType?: string; userId?: string }) =>
-      request<{ file: any; extractedText: string }>('/ocr/upload', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-
-    getFiles: (userId?: string, search?: string) => {
-      const params = new URLSearchParams();
-      if (userId) params.append('userId', userId);
-      if (search) params.append('search', search);
-      return request<any[]>(`/ocr/files?${params.toString()}`);
-    },
-
-    getFile: (id: string, userId?: string) =>
-      request<any>(`/ocr/files/${id}${userId ? `?userId=${userId}` : ''}`),
-
-    updateFile: (id: string, data: { name: string }, userId?: string) =>
-      request<any>(`/ocr/files/${id}${userId ? `?userId=${userId}` : ''}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
-
-    deleteFile: (id: string, userId?: string) =>
-      request(`/ocr/files/${id}${userId ? `?userId=${userId}` : ''}`, {
-        method: 'DELETE',
-      }),
   },
 
   // Sessions

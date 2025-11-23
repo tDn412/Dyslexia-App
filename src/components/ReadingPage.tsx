@@ -3,8 +3,9 @@ import { ReadingToolbar } from './ReadingToolbar';
 import { QuickSettingsDrawer } from './QuickSettingsDrawer';
 import { useState, useRef, useEffect } from 'react';
 import { Plus, Volume2 } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
-import { speakText } from '../utils/textToSpeech';
+import { toast } from 'sonner';
+import { speakText, stopSpeaking, pauseSpeaking, resumeSpeaking } from '../utils/textToSpeech';
+import { api } from '../utils/api';
 
 interface ReadingPageProps {
   onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
@@ -64,9 +65,8 @@ function ContextualToolbar({ word, position, onClose, onAddToLibrary, onToggleBo
         onClick={() => {
           onToggleBold(word);
         }}
-        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-sm hover:shadow-md ${
-          isBold ? 'bg-[#FFE8CC] hover:bg-[#FFDDB3]' : 'bg-[#D4E7F5] hover:bg-[#C5DCF0]'
-        }`}
+        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-sm hover:shadow-md ${isBold ? 'bg-[#FFE8CC] hover:bg-[#FFDDB3]' : 'bg-[#D4E7F5] hover:bg-[#C5DCF0]'
+          }`}
         aria-label="Toggle bold"
         title="Đậm"
         style={{
@@ -102,12 +102,56 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // NLP Data
+  const [processedSentences, setProcessedSentences] = useState<string[]>([]);
+  const [processedWords, setProcessedWords] = useState<string[][]>([]);
+  const [isLoadingNLP, setIsLoadingNLP] = useState(true);
+
   const readingBoxRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const lastScrollTime = useRef<number>(0);
   const scrollThrottle = 400; // Milliseconds between line changes
-  
+
   const sampleText = `Con bướm đáp nhẹ nhàng trên bông hoa đầy màu sắc. Đôi cánh của nó có màu cam và đen tươi sáng, với những hoa văn đẹp trông giống như những ô cửa sổ nhỏ. Con bướm nghỉ ở đó một lúc, tận hưởng ánh nắng ấm áp. Đột nhiên, một cơn gió nhẹ thổi qua khu vườn. Con bướm mở và khép đôi cánh từ từ, như thể nó đang chào gió. Sau đó nó bay lên bầu trời, nhảy múa giữa những đám mây. Lũ trẻ quan sát từ bên dưới, chỉ tay và mỉm cười. Chúng thích nhìn con bướm nhảy múa trên không. Đó là một ngày hè hoàn hảo.`;
+
+  // Load NLP data
+  useEffect(() => {
+    const loadNLP = async () => {
+      try {
+        setIsLoadingNLP(true);
+        const response = await api.nlp.segment(sampleText);
+
+        if (response.data) {
+          setProcessedSentences(response.data.sentences);
+          // Flatten words for simple display or use words_per_sentence
+          // For now, we'll just use the sentences and split locally if needed, 
+          // or use the words_per_sentence if provided.
+          // The API returns words_per_sentence: string[][]
+          setProcessedWords(response.data.words_per_sentence);
+        } else {
+          // Fallback if API fails
+          setProcessedSentences(sampleText.match(/[^.!?]+[.!?]+/g) || [sampleText]);
+        }
+      } catch (error) {
+        console.error('NLP Error:', error);
+        // Fallback
+        setProcessedSentences(sampleText.match(/[^.!?]+[.!?]+/g) || [sampleText]);
+      } finally {
+        setIsLoadingNLP(false);
+      }
+    };
+
+    loadNLP();
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopSpeaking();
+    };
+  }, []);
 
   const handleWordClick = (word: string, event: React.MouseEvent) => {
     const rect = (event.target as HTMLElement).getBoundingClientRect();
@@ -148,16 +192,24 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   };
 
   const handlePlayText = async () => {
-    if (isPlaying) {
-      // Stop speaking
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-      setIsPlaying(false);
+    // If paused, resume
+    if (isPaused) {
+      resumeSpeaking();
+      setIsPaused(false);
       return;
     }
 
+    // If playing, pause
+    if (isPlaying) {
+      pauseSpeaking();
+      setIsPaused(true);
+      return;
+    }
+
+    // Start new playback
     setIsPlaying(true);
+    setIsPaused(false);
+
     try {
       await speakText({
         text: sampleText,
@@ -169,22 +221,23 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
       toast.error('Không thể phát âm. Vui lòng thử lại.');
     } finally {
       setIsPlaying(false);
+      setIsPaused(false);
     }
   };
 
   // Highlight mirror letters within a word
   const highlightMirrorLetters = (text: string) => {
     if (!isMirrorEnabled) return text;
-    
+
     const chars = text.split('');
     return chars.map((char, idx) => {
       const lowerChar = char.toLowerCase();
-      
+
       // Check for m/n/u group
       if (['m', 'n', 'u'].includes(lowerChar)) {
         return (
-          <span 
-            key={idx} 
+          <span
+            key={idx}
             className="rounded px-0.5"
             style={{ backgroundColor: '#CBE7FF' }}
           >
@@ -192,12 +245,12 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
           </span>
         );
       }
-      
+
       // Check for q/p/b/d group
       if (['q', 'p', 'b', 'd'].includes(lowerChar)) {
         return (
-          <span 
-            key={idx} 
+          <span
+            key={idx}
             className="rounded px-0.5"
             style={{ backgroundColor: '#FAD4D4' }}
           >
@@ -205,30 +258,50 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
           </span>
         );
       }
-      
+
       return char;
     });
   };
 
   // Split text into interactive words
   const renderInteractiveText = () => {
-    const words = sampleText.split(/(\s+)/);
-    return words.map((segment, index) => {
-      const trimmedWord = segment.trim();
-      if (!trimmedWord) return <span key={index}>{segment}</span>;
-      
-      const isBold = boldWords.has(trimmedWord);
-      
+    if (isLoadingNLP) return <p>Đang tải văn bản...</p>;
+
+    // Use processed sentences to render
+    return processedSentences.map((sentence, sIdx) => {
+      // If we have word data from NLP, use it. Otherwise split locally.
+      const words = processedWords[sIdx] || sentence.split(/(\s+)/);
+
       return (
-        <span
-          key={index}
-          onClick={(e) => handleWordClick(trimmedWord, e)}
-          className="cursor-pointer hover:bg-[#FFE8CC] hover:bg-opacity-50 rounded px-1 transition-colors inline-block"
-          style={{
-            fontWeight: isBold ? 'bold' : 'normal',
-          }}
-        >
-          {highlightMirrorLetters(segment)}
+        <span key={sIdx}>
+          {words.map((segment, wIdx) => {
+            const trimmedWord = segment.trim();
+            // Add space after words if using NLP words array (which usually doesn't include spaces)
+            // Simple heuristic: if segment is a word, add space.
+            // However, processedWords from API likely contains just words.
+            // We need to be careful about spacing.
+            // For simplicity, if using processedWords, we add a space after each word.
+
+            if (!trimmedWord) return <span key={wIdx}>{segment}</span>;
+
+            const isBold = boldWords.has(trimmedWord);
+
+            return (
+              <span key={wIdx}>
+                <span
+                  onClick={(e) => handleWordClick(trimmedWord, e)}
+                  className="cursor-pointer hover:bg-[#FFE8CC] hover:bg-opacity-50 rounded px-1 transition-colors inline-block"
+                  style={{
+                    fontWeight: isBold ? 'bold' : 'normal',
+                  }}
+                >
+                  {highlightMirrorLetters(segment)}
+                </span>
+                {/* Add space if using processedWords array directly */}
+                {processedWords[sIdx] ? ' ' : ''}
+              </span>
+            );
+          })}
         </span>
       );
     });
@@ -236,14 +309,16 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
   // Render text in Focus Mode (line by line)
   const renderFocusModeText = () => {
-    return sentences.map((sentence, index) => {
-      const words = sentence.split(/(\s+)/);
+    if (isLoadingNLP) return <p>Đang tải văn bản...</p>;
+
+    return processedSentences.map((sentence, index) => {
+      const words = processedWords[index] || sentence.split(/(\s+)/);
       const opacity = getLineOpacity(index);
-      
+
       return (
         <div
           key={index}
-          ref={(el) => (lineRefs.current[index] = el)}
+          ref={(el) => { lineRefs.current[index] = el; }}
           onClick={() => setCurrentLineIndex(index)}
           className="cursor-pointer transition-opacity duration-500 mb-6"
           style={{
@@ -254,22 +329,24 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
           {words.map((segment, wordIndex) => {
             const trimmedWord = segment.trim();
             if (!trimmedWord) return <span key={wordIndex}>{segment}</span>;
-            
+
             const isBold = boldWords.has(trimmedWord);
-            
+
             return (
-              <span
-                key={wordIndex}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleWordClick(trimmedWord, e);
-                }}
-                className="hover:bg-[#FFE8CC] hover:bg-opacity-50 rounded px-1 transition-colors inline-block"
-                style={{
-                  fontWeight: isBold ? 'bold' : 'normal',
-                }}
-              >
-                {highlightMirrorLetters(segment)}
+              <span key={wordIndex}>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleWordClick(trimmedWord, e);
+                  }}
+                  className="hover:bg-[#FFE8CC] hover:bg-opacity-50 rounded px-1 transition-colors inline-block"
+                  style={{
+                    fontWeight: isBold ? 'bold' : 'normal',
+                  }}
+                >
+                  {highlightMirrorLetters(segment)}
+                </span>
+                {processedWords[index] ? ' ' : ''}
               </span>
             );
           })}
@@ -286,23 +363,20 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     setIsQuickSettingsOpen(!isQuickSettingsOpen);
   };
 
-  // Split text into sentences for Focus Mode
-  const sentences = sampleText.match(/[^.!?]+[.!?]+/g) || [sampleText];
-
   // Auto-scroll to center the current line in Focus Mode
   useEffect(() => {
     if (isFocusMode && readingBoxRef.current && lineRefs.current[currentLineIndex]) {
       const container = readingBoxRef.current;
       const currentLine = lineRefs.current[currentLineIndex];
-      
+
       if (currentLine) {
         const containerHeight = container.clientHeight;
         const lineTop = currentLine.offsetTop;
         const lineHeight = currentLine.clientHeight;
-        
+
         // Calculate scroll position to center the line
         const scrollTo = lineTop - (containerHeight / 2) + (lineHeight / 2);
-        
+
         container.scrollTo({
           top: scrollTo,
           behavior: 'smooth'
@@ -329,7 +403,7 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFocusMode, currentLineIndex, sentences.length]);
+  }, [isFocusMode, currentLineIndex, processedSentences.length]);
 
   // Handle mouse wheel scrolling in Focus Mode
   useEffect(() => {
@@ -367,14 +441,14 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         readingBox.removeEventListener('wheel', handleWheel);
       }
     };
-  }, [isFocusMode, currentLineIndex, sentences.length]);
+  }, [isFocusMode, currentLineIndex, processedSentences.length]);
 
   // Calculate opacity for each line in Focus Mode
   const getLineOpacity = (lineIndex: number) => {
     if (!isFocusMode) return 1;
-    
+
     const distance = Math.abs(lineIndex - currentLineIndex);
-    
+
     if (distance === 0) return 1; // Current line - full opacity
     if (distance === 1) return 0.25; // Adjacent lines - mờ hơn gấp đôi
     if (distance === 2) return 0.12; // 2 lines away - mờ hơn gấp đôi
@@ -391,15 +465,15 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   // Navigate to next line in Focus Mode
   const handleNextLine = () => {
     if (isFocusMode) {
-      setCurrentLineIndex((prev) => Math.min(sentences.length - 1, prev + 1));
+      setCurrentLineIndex((prev) => Math.min(processedSentences.length - 1, prev + 1));
     }
   };
 
   return (
     <div className="flex h-screen bg-[#FFF8E7]">
       {/* Sidebar */}
-      <Sidebar 
-        activePage="Đọc" 
+      <Sidebar
+        activePage="Đọc"
         onNavigate={onNavigate}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
@@ -410,13 +484,12 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
       <main className="flex-1 overflow-hidden flex flex-col h-screen">
         <div className="flex-1 flex items-center justify-center px-12 pt-8 pb-4 overflow-hidden">
           {/* Reading Content Frame */}
-          <div 
+          <div
             ref={readingBoxRef}
-            className={`w-full max-w-4xl h-full max-h-[calc(100vh-180px)] bg-[#FFF8E7] rounded-[2rem] border-2 border-[#E8DCC8] shadow-lg p-12 relative ${
-              isFocusMode ? 'focus-mode-active overflow-hidden' : 'overflow-y-auto'
-            }`}
+            className={`w-full max-w-4xl h-full max-h-[calc(100vh-180px)] bg-[#FFF8E7] rounded-[2rem] border-2 border-[#E8DCC8] shadow-lg p-12 relative ${isFocusMode ? 'focus-mode-active overflow-hidden' : 'overflow-y-auto'
+              }`}
           >
-            <div 
+            <div
               className="text-[#111111] mx-auto select-none"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -433,13 +506,13 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
             {/* Focus Mode Gradient Overlays */}
             {isFocusMode && (
               <>
-                <div 
+                <div
                   className="absolute top-0 left-0 right-0 h-24 pointer-events-none"
                   style={{
                     background: 'linear-gradient(to bottom, #FFF8E7 0%, transparent 100%)',
                   }}
                 />
-                <div 
+                <div
                   className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
                   style={{
                     background: 'linear-gradient(to top, #FFF8E7 0%, transparent 100%)',
@@ -452,7 +525,7 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
         {/* Toolbar */}
         <div className="pb-6 flex-shrink-0">
-          <ReadingToolbar 
+          <ReadingToolbar
             onToggleMirror={setIsMirrorEnabled}
             onToggleSyllable={setIsSyllableMode}
             onToggleFocusMode={setIsFocusMode}
@@ -462,7 +535,7 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
             isMirrorEnabled={isMirrorEnabled}
             isSyllableMode={isSyllableMode}
             isFocusMode={isFocusMode}
-            isPlaying={isPlaying}
+            isPlaying={isPlaying || isPaused}
           />
         </div>
 
@@ -481,7 +554,7 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
       </main>
 
       {/* Quick Settings Drawer */}
-      <QuickSettingsDrawer 
+      <QuickSettingsDrawer
         isCollapsed={!isQuickSettingsOpen}
         onToggle={handleQuickSettingsToggle}
       />

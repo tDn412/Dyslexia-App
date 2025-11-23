@@ -4,6 +4,7 @@ import svgPaths from '../imports/svg-5gav2b48w6';
 import { Check, X } from 'lucide-react';
 import { speakText } from '../utils/textToSpeech';
 import { toast } from 'sonner';
+import { api } from '../utils/api';
 
 interface LibraryPageProps {
   onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
@@ -25,6 +26,8 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   const [isAddWordPopupOpen, setIsAddWordPopupOpen] = useState(false);
   const [newWordInput, setNewWordInput] = useState('');
   const popupRef = useRef<HTMLDivElement>(null);
+  const [words, setWords] = useState<Word[]>([]);
+  const [isLoadingWords, setIsLoadingWords] = useState(true);
 
   // Vietnamese alphabet for the filter
   const alphabet = [
@@ -33,31 +36,46 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     'U', 'Ư', 'V', 'X', 'Y'
   ];
 
-  // Sample word data
-  const allWords: Word[] = [
-    // Today
-    { id: 1, text: 'bươm bướm', dateAdded: new Date() },
-    { id: 2, text: 'vườn hoa', dateAdded: new Date() },
-    { id: 3, text: 'màu sắc', dateAdded: new Date() },
-    
-    // Yesterday
-    { id: 7, text: 'gia đình', dateAdded: new Date(Date.now() - 86400000) },
-    { id: 8, text: 'yêu thương', dateAdded: new Date(Date.now() - 86400000) },
-    { id: 9, text: 'chăm sóc', dateAdded: new Date(Date.now() - 86400000) },
-    
-    // 30/10/2025
-    { id: 12, text: 'động vật', dateAdded: new Date(Date.now() - 172800000) },
-    { id: 13, text: 'thú vị', dateAdded: new Date(Date.now() - 172800000) },
-    { id: 14, text: 'học hỏi', dateAdded: new Date(Date.now() - 172800000) },
-    
-    // 29/10/2025
-    { id: 15, text: 'khám phá', dateAdded: new Date(Date.now() - 259200000) },
-    { id: 16, text: 'phiêu lưu', dateAdded: new Date(Date.now() - 259200000) },
-    { id: 17, text: 'tuyệt vời', dateAdded: new Date(Date.now() - 259200000) },
-  ];
+  // Load words from backend on mount
+  useEffect(() => {
+    const loadWords = async () => {
+      try {
+        setIsLoadingWords(true);
+        const response = await api.library.getWords();
+        if (response.data) {
+          const loadedWords = response.data.map((w: any) => ({
+            id: w.id,
+            text: w.text,
+            dateAdded: new Date(w.dateAdded || w.createdAt || Date.now())
+          }));
+          setWords(loadedWords);
+        } else if (response.error) {
+          console.error('Error loading words:', response.error);
+          // Use sample data as fallback
+          setWords([
+            { id: 1, text: 'bươm bướm', dateAdded: new Date() },
+            { id: 2, text: 'vườn hoa', dateAdded: new Date() },
+            { id: 3, text: 'màu sắc', dateAdded: new Date() },
+          ]);
+        }
+      } catch (error) {
+        console.error('Error loading words:', error);
+        // Use sample data as fallback
+        setWords([
+          { id: 1, text: 'bươm bướm', dateAdded: new Date() },
+          { id: 2, text: 'vườn hoa', dateAdded: new Date() },
+          { id: 3, text: 'màu sắc', dateAdded: new Date() },
+        ]);
+      } finally {
+        setIsLoadingWords(false);
+      }
+    };
+
+    loadWords();
+  }, []);
 
   // Filter words based on search and selected letter
-  const filteredWords = allWords.filter(word => {
+  const filteredWords = words.filter(word => {
     const matchesSearch = word.text.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesLetter = !selectedLetter || word.text.charAt(0).toUpperCase() === selectedLetter;
     return matchesSearch && matchesLetter;
@@ -67,7 +85,7 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   const groupWordsByDate = (words: Word[]) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
@@ -115,12 +133,49 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     setNewWordInput('');
   };
 
-  const handleConfirmAddWord = () => {
+  const handleConfirmAddWord = async () => {
     if (newWordInput.trim()) {
-      console.log(`Adding new word: ${newWordInput.trim()}`);
-      // Here you would add the word to your state/database
-      setIsAddWordPopupOpen(false);
-      setNewWordInput('');
+      try {
+        const response = await api.library.addWord({
+          text: newWordInput.trim()
+        });
+
+        if (response.error) {
+          toast.error('Lỗi khi thêm từ: ' + response.error);
+          return;
+        }
+
+        const newWord: Word = {
+          id: response.data?.id || Date.now(),
+          text: newWordInput.trim(),
+          dateAdded: new Date()
+        };
+
+        setWords([newWord, ...words]);
+        setIsAddWordPopupOpen(false);
+        setNewWordInput('');
+        toast.success(`Đã thêm từ "${newWord.text}" vào thư viện!`);
+      } catch (error) {
+        console.error('Error adding word:', error);
+        toast.error('Không thể thêm từ. Vui lòng thử lại.');
+      }
+    }
+  };
+
+  const handleDeleteWord = async (wordId: number, wordText: string) => {
+    try {
+      const response = await api.library.deleteWord(wordId.toString());
+
+      if (response.error) {
+        toast.error('Lỗi khi xóa từ: ' + response.error);
+        return;
+      }
+
+      setWords(words.filter(w => w.id !== wordId));
+      toast.success(`Đã xóa từ "${wordText}" khỏi thư viện!`);
+    } catch (error) {
+      console.error('Error deleting word:', error);
+      toast.error('Không thể xóa từ. Vui lòng thử lại.');
     }
   };
 
@@ -157,8 +212,8 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   return (
     <div className="flex h-screen bg-[#fff8e7]">
       {/* Sidebar */}
-      <Sidebar 
-        activePage="Thư viện" 
+      <Sidebar
+        activePage="Thư viện"
         onNavigate={onNavigate}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
@@ -187,7 +242,7 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
               </div>
               <div aria-hidden="true" className="absolute border-2 border-[#e0dccc] border-solid inset-0 pointer-events-none rounded-[27px] shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.1),0px_2px_4px_-2px_rgba(0,0,0,0.1)]" />
             </div>
-            
+
             {/* Search Icon */}
             <div className="absolute left-[27px] size-[27px] top-[27.5px]">
               <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 27 27">
@@ -202,7 +257,7 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
           {/* Word Groups */}
           <div className="flex flex-col gap-[48px] w-full">
             {Object.entries(groupedWords).length === 0 ? (
-              <div 
+              <div
                 className="text-center text-[#666666] py-12"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -216,7 +271,7 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
               Object.entries(groupedWords).map(([dateGroup, words]) => (
                 <div key={dateGroup} className="flex flex-col gap-[32px]">
                   {/* Date Header */}
-                  <h2 
+                  <h2
                     className="text-[#111111]"
                     style={{
                       fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -229,10 +284,9 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
                   </h2>
 
                   {/* Word Cards Grid - Responsive: 3 cards when sidebar expanded, 4 when collapsed */}
-                  <div 
-                    className={`grid gap-6 w-full ${
-                      isSidebarCollapsed ? 'grid-cols-4' : 'grid-cols-3'
-                    }`}
+                  <div
+                    className={`grid gap-6 w-full ${isSidebarCollapsed ? 'grid-cols-4' : 'grid-cols-3'
+                      }`}
                   >
                     {words.map((word) => (
                       <div
@@ -240,10 +294,10 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
                         className="bg-[#fffcf2] h-[220px] relative rounded-[18px] cursor-pointer hover:shadow-lg transition-shadow"
                       >
                         <div aria-hidden="true" className="absolute border-2 border-[#e0dccc] border-solid inset-0 pointer-events-none rounded-[18px] shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.1),0px_2px_4px_-2px_rgba(0,0,0,0.1)]" />
-                        
+
                         {/* Word Text */}
                         <div className="absolute inset-0 flex items-center justify-center px-6 pb-8">
-                          <p 
+                          <p
                             className="text-[#111111] text-center break-words"
                             style={{
                               fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -275,6 +329,18 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
                             </svg>
                           </div>
                         </button>
+
+                        {/* Delete Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteWord(word.id, word.text);
+                          }}
+                          className="absolute bg-[#FAD4D4] box-border flex items-center justify-center left-3 top-3 rounded-full shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)] size-[45px] hover:bg-[#F5BABA] hover:shadow-md transition-all"
+                          aria-label="Xóa từ"
+                        >
+                          <X className="w-5 h-5 text-[#111111]" strokeWidth={2.5} />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -288,9 +354,9 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         <div className="fixed right-4 top-[10%] bottom-[15%] w-[70px] z-10 flex flex-col">
           {/* Top Gradient Fade */}
           <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-[#fff8e7] to-transparent pointer-events-none z-20" />
-          
+
           {/* Scrollable Alphabet Container */}
-          <div 
+          <div
             ref={alphabetContainerRef}
             className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide py-4"
             style={{
@@ -303,17 +369,16 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
                 <button
                   key={letter}
                   onClick={() => setSelectedLetter(selectedLetter === letter ? null : letter)}
-                  className={`rounded-full transition-all flex items-center justify-center shrink-0 ${
-                    selectedLetter === letter
+                  className={`rounded-full transition-all flex items-center justify-center shrink-0 ${selectedLetter === letter
                       ? 'bg-[#c8e4f5] shadow-md w-[56px] h-[56px]'
                       : 'bg-[#fffcf2] hover:bg-[#fff4e0] shadow-sm w-[50px] h-[50px]'
-                  }`}
+                    }`}
                   style={{
                     border: '2px solid #e0dccc',
                   }}
                   aria-label={`Lọc từ bắt đầu bằng ${letter}`}
                 >
-                  <p 
+                  <p
                     className="text-[#111111]"
                     style={{
                       fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -352,7 +417,7 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         {/* Add Word Popup */}
         {isAddWordPopupOpen && (
           <div className="fixed inset-0 backdrop-blur-sm bg-[#fff8e7] bg-opacity-60 z-40 flex items-center justify-center">
-            <div 
+            <div
               ref={popupRef}
               className="bg-[#fffcf2] rounded-3xl border-2 border-[#e0dccc] shadow-2xl p-8 w-[420px]"
             >

@@ -1,38 +1,12 @@
+import { api } from './api';
+import { toast } from 'sonner';
+
 /**
- * Text-to-Speech utility using Web Speech API
+ * Text-to-Speech utility using Backend API
  */
 
-let voicesLoaded = false;
-let voices: SpeechSynthesisVoice[] = [];
-
-// Load voices when available
-const loadVoices = () => {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return;
-  }
-
-  try {
-    voices = window.speechSynthesis.getVoices();
-    voicesLoaded = voices.length > 0;
-  } catch (error) {
-    console.warn('Error loading voices:', error);
-  }
-};
-
-// Initialize voices loading
-if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-  // Try to load immediately
-  loadVoices();
-  
-  // Some browsers load voices asynchronously
-  if (window.speechSynthesis.onvoiceschanged !== undefined) {
-    window.speechSynthesis.onvoiceschanged = loadVoices;
-  }
-  
-  // Also try loading after a short delay (for Chrome)
-  setTimeout(loadVoices, 100);
-  setTimeout(loadVoices, 500);
-}
+let currentAudio: HTMLAudioElement | null = null;
+let isPausedState = false;
 
 export interface SpeakOptions {
   text: string;
@@ -41,97 +15,86 @@ export interface SpeakOptions {
   pitch?: number;
   volume?: number;
   voice?: string;
+  onWordBoundary?: (wordIndex: number) => void; // Callback for word highlighting
 }
 
 /**
- * Speak text using Web Speech API
+ * Speak text using Backend API
  */
-export const speakText = (options: SpeakOptions): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      reject(new Error('Speech synthesis is not supported in this browser'));
+export const speakText = async (options: SpeakOptions): Promise<void> => {
+  try {
+    // Stop any currently playing audio
+    stopSpeaking();
+
+    const { text } = options;
+
+    if (!text.trim()) {
       return;
     }
 
-    // Always try to reload voices (some browsers load them lazily)
-    loadVoices();
-    
-    // Get fresh voices list
-    if (voices.length === 0) {
-      voices = window.speechSynthesis.getVoices();
+    // Call API to get audio from Google Cloud TTS
+    const response = await api.tts.speak(text);
+
+    if (response.error || !response.data?.audio_base64) {
+      throw new Error(response.error || 'Failed to generate speech');
     }
 
-    // Cancel any ongoing speech
+    // Decode base64 and play
+    const audioSrc = `data:audio/mp3;base64,${response.data.audio_base64}`;
+    const audio = new Audio(audioSrc);
+
+    currentAudio = audio;
+
+    return new Promise((resolve, reject) => {
+      audio.onended = () => {
+        currentAudio = null;
+        resolve();
+      };
+
+      audio.onerror = (e) => {
+        console.error('Audio playback error:', e);
+        currentAudio = null;
+        reject(new Error('Audio playback failed'));
+      };
+
+      audio.play().catch((err) => {
+        console.error('Play error:', err);
+        reject(err);
+      });
+    });
+
+  } catch (error) {
+    console.error('TTS Error:', error);
+    toast.error('Không thể đọc văn bản. Vui lòng thử lại.');
+    throw error;
+  }
+};
+
+/**
+ * Speak using browser API (Fallback)
+ */
+const speakWithBrowser = (options: SpeakOptions): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      reject(new Error('Browser TTS not supported'));
+      return;
+    }
+
     window.speechSynthesis.cancel();
 
-    const {
-      text,
-      lang = 'vi-VN',
-      rate = 1.0,
-      pitch = 1.0,
-      volume = 1.0,
-      voice,
-    } = options;
+    const utterance = new SpeechSynthesisUtterance(options.text);
+    utterance.lang = 'vi-VN'; // Try Vietnamese
+    utterance.rate = options.rate || 1.0;
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = lang;
-    utterance.rate = rate;
-    utterance.pitch = pitch;
-    utterance.volume = volume;
+    // Try to find a Vietnamese voice
+    const voices = window.speechSynthesis.getVoices();
+    const viVoice = voices.find(v => v.lang.includes('vi'));
+    if (viVoice) utterance.voice = viVoice;
 
-    // Try to find and set voice (non-blocking - browser will use default if not found)
-    if (voices.length > 0) {
-      if (voice) {
-        const selectedVoice = voices.find(
-          (v) => v.name.includes(voice) || v.lang.includes(lang)
-        );
-        if (selectedVoice) {
-          utterance.voice = selectedVoice;
-        }
-      } else {
-        // Try to find Vietnamese voice first
-        let selectedVoice = voices.find((v) => v.lang.includes('vi'));
-        
-        // If no Vietnamese voice, try other languages that might work
-        if (!selectedVoice) {
-          // Try Thai (similar language family)
-          selectedVoice = voices.find((v) => v.lang.includes('th'));
-        }
-        
-        // If still no voice, try any available voice (browser will use default if not set)
-        if (selectedVoice) {
-          utterance.voice = selectedVoice;
-        }
-      }
-    }
-    
-    // Even without voices, browser will try to pronounce the text
-    // Setting lang is the most important part
+    utterance.onend = () => resolve();
+    utterance.onerror = (e) => reject(e);
 
-    utterance.onend = () => {
-      resolve();
-    };
-
-    utterance.onerror = (event: SpeechSynthesisErrorEvent) => {
-      const errorMessage = event.error || 'Speech synthesis error';
-      console.error('Speech synthesis error:', errorMessage);
-      reject(new Error(errorMessage));
-    };
-
-    // Start speaking
-    try {
-      window.speechSynthesis.speak(utterance);
-      
-      // Fallback: if speech doesn't start, reject after timeout
-      setTimeout(() => {
-        if (window.speechSynthesis.speaking === false && window.speechSynthesis.pending === false) {
-          // Speech didn't start, might be an issue
-          console.warn('Speech synthesis may not have started');
-        }
-      }, 100);
-    } catch (error) {
-      reject(error instanceof Error ? error : new Error('Failed to start speech'));
-    }
+    window.speechSynthesis.speak(utterance);
   });
 };
 
@@ -139,30 +102,60 @@ export const speakText = (options: SpeakOptions): Promise<void> => {
  * Stop any ongoing speech
  */
 export const stopSpeaking = () => {
-  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    currentAudio = null;
+  }
+  isPausedState = false;
+};
+
+/**
+ * Pause current speech
+ */
+export const pauseSpeaking = () => {
+  if (currentAudio && !currentAudio.paused) {
+    currentAudio.pause();
+    isPausedState = true;
   }
 };
 
 /**
- * Get available voices
+ * Resume paused speech
+ */
+export const resumeSpeaking = () => {
+  if (currentAudio && isPausedState) {
+    currentAudio.play();
+    isPausedState = false;
+  }
+};
+
+/**
+ * Check if speech is currently paused
+ */
+export const isSpeaking = () => {
+  return currentAudio !== null && !currentAudio.paused;
+};
+
+/**
+ * Check if speech is paused
+ */
+export const isPaused = () => {
+  return isPausedState;
+};
+
+/**
+ * Get available voices (Mock for compatibility)
  */
 export const getVoices = (): SpeechSynthesisVoice[] => {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return [];
-  }
-  
-  if (!voicesLoaded) {
-    loadVoices();
-  }
-  
-  return voices;
+  // Return empty or mock voices since we use backend
+  return [];
 };
 
 /**
- * Check if speech synthesis is supported
+ * Check if speech synthesis is supported (Always true for API)
  */
 export const isSpeechSynthesisSupported = (): boolean => {
-  return typeof window !== 'undefined' && 'speechSynthesis' in window;
+  return true;
 };
 

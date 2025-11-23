@@ -4,7 +4,8 @@ import { QuickSettingsDrawer } from './QuickSettingsDrawer';
 import { useState, useEffect, useRef } from 'react';
 import { AudioRecorder } from '../utils/recording';
 import { toast } from 'sonner';
-import { speakText } from '../utils/textToSpeech';
+import { speakText, stopSpeaking, pauseSpeaking, resumeSpeaking, isPaused as checkIsPaused } from '../utils/textToSpeech';
+import { api } from '../utils/api';
 
 interface SpeakingPageProps {
   onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
@@ -18,9 +19,12 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
   const [seconds, setSeconds] = useState(0);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [incorrectWords, setIncorrectWords] = useState<number[]>([]);
+  const [correctWords, setCorrectWords] = useState<number[]>([]);
   const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false);
   const recorderRef = useRef<AudioRecorder | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const playbackAbortRef = useRef<boolean>(false);
 
   // Sample text split into words
   const sampleText = `Con bướm đáp nhẹ nhàng trên bông hoa đầy màu sắc. Đôi cánh của nó có màu cam và đen tươi sáng, với những hoa văn đẹp trông giống như những ô cửa sổ nhỏ. Con bướm nghỉ ở đó một lúc, tận hưởng ánh nắng ấm áp. Đột nhiên, một cơn gió nhẹ thổi qua khu vườn. Con bướm mở và khép đôi cánh từ từ, như thể nó đang chào gió. Sau đó nó bay lên bầu trời, nhảy múa giữa những đám mây. Lũ trẻ quan sát từ bên dưới, chỉ tay và mỉm cười. Chúng thích nhìn con bướm nhảy múa trên không. Đó là một ngày hè hoàn hảo.`;
@@ -44,15 +48,15 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
 
     return () => {
       if (recorderRef.current) {
-        recorderRef.current.stop().catch(() => {});
+        recorderRef.current.stop().catch(() => { });
       }
     };
   }, []);
 
   // Timer effect
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    
+    let interval: ReturnType<typeof setInterval> | null = null;
+
     if (isRecording) {
       interval = setInterval(() => {
         setSeconds((s) => s + 1);
@@ -60,30 +64,19 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
     } else {
       setSeconds(0);
     }
-    
+
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [isRecording]);
 
-  // Play text function
-  const handlePlayText = async () => {
-    if (isPlaying) return;
-    
-    setIsPlaying(true);
-    try {
-      await speakText({
-        text: sampleText,
-        lang: 'vi-VN',
-        rate: 1.0,
-      });
-    } catch (error) {
-      console.error('Error playing text:', error);
-      toast.error('Không thể phát âm. Vui lòng thử lại.');
-    } finally {
-      setIsPlaying(false);
-    }
-  };
+  // Cleanup on unmount or navigation
+  useEffect(() => {
+    return () => {
+      stopSpeaking();
+      playbackAbortRef.current = true;
+    };
+  }, []);
 
   // Format time as MM:SS
   const formatTime = (totalSeconds: number) => {
@@ -103,20 +96,95 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
         // Stop recording
         const audioBlob = await recorderRef.current.stop();
         setIsRecording(false);
-        toast.success('Đã dừng ghi âm');
-        
-        // Here you would send audioBlob to backend for analysis
-        console.log('Recording stopped, audio blob size:', audioBlob.size);
-        
-        // Simulate analysis (in real app, send to backend)
-        // For now, just simulate some incorrect words
-        setIncorrectWords([2, 5, 8]);
+        toast.success('Đã dừng ghi âm. Đang phân tích...');
+
+        // Send to backend for analysis
+        try {
+          const response = await api.pronunciation.check(sampleText, audioBlob);
+
+          if (response.data && response.data.word_scores) {
+            console.log('✅ Pronunciation API Response:', response.data);
+            toast.success('Phân tích hoàn tất!');
+
+            // Map response to incorrect words
+            const scores = response.data.word_scores;
+            console.log('📊 Word Scores:', scores);
+
+            const lowScoreIndices: number[] = [];
+            const correctIndices: number[] = [];
+
+            // Simple mapping strategy: iterate through our `words` array (which includes spaces)
+            // and match with `scores` array (which likely doesn't).
+            let scoreIndex = 0;
+            words.forEach((word, index) => {
+              if (word.trim() === '') return;
+
+              if (scoreIndex < scores.length) {
+                const scoreData = scores[scoreIndex];
+                console.log(`Word "${word}" (index ${index}): score = ${scoreData.pronunciation_score}`);
+
+                // Threshold for "incorrect" (e.g., < 80)
+                if (scoreData.pronunciation_score < 80) {
+                  lowScoreIndices.push(index);
+                } else {
+                  correctIndices.push(index);
+                }
+                scoreIndex++;
+              }
+            });
+
+            console.log('❌ Incorrect word indices:', lowScoreIndices);
+            console.log('✅ Correct word indices:', correctIndices);
+
+            setIncorrectWords(lowScoreIndices);
+            setCorrectWords(correctIndices);
+
+            if (lowScoreIndices.length === 0) {
+              toast.success('Phát âm tuyệt vời!');
+            } else {
+              toast.info(`Bạn cần cải thiện ${lowScoreIndices.length} từ.`);
+            }
+          } else {
+            // Backend failed or word_scores missing - use simulation for demo
+            console.warn('⚠️ Backend failed or word scores missing, using simulation');
+            toast.warning('Backend không khả dụng hoặc dữ liệu không đầy đủ. Đang hiển thị kết quả mô phỏng.');
+
+            // Simulate: randomly mark some words as correct (blue) and some as incorrect (red)
+            const lowScoreIndices: number[] = [];
+            const correctIndices: number[] = [];
+
+            let wordCount = 0;
+            words.forEach((word, index) => {
+              if (word.trim() === '') return;
+
+              // Simulate: every 3rd word is "incorrect", others are "correct"
+              if (wordCount % 3 === 0) {
+                lowScoreIndices.push(index);
+              } else {
+                correctIndices.push(index);
+              }
+              wordCount++;
+            });
+
+            console.log('🎭 Simulated incorrect indices:', lowScoreIndices);
+            console.log('🎭 Simulated correct indices:', correctIndices);
+
+            setIncorrectWords(lowScoreIndices);
+            setCorrectWords(correctIndices);
+            toast.info(`(Mô phỏng) Bạn cần cải thiện ${lowScoreIndices.length} từ.`);
+          }
+        } catch (apiError) {
+          console.error('API Analysis Error:', apiError);
+          toast.error('Không thể phân tích phát âm. Vui lòng thử lại.');
+        }
+
       } else {
         // Start recording
         await recorderRef.current.start();
         setIsRecording(true);
         setSeconds(0);
         setIncorrectWords([]);
+        setCorrectWords([]);
         setCurrentWordIndex(0);
         toast.success('Bắt đầu ghi âm...');
       }
@@ -134,6 +202,10 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
   };
 
   const handleReset = async () => {
+    // Stop any ongoing playback
+    stopSpeaking();
+    playbackAbortRef.current = true;
+
     // Stop recording if active
     if (isRecording && recorderRef.current) {
       try {
@@ -142,31 +214,25 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
         console.error('Error stopping recorder:', error);
       }
     }
-    
+
     setIsRecording(false);
+    setIsPlaying(false);
+    setIsPaused(false);
     setSeconds(0);
     setCurrentWordIndex(0);
     setIncorrectWords([]);
-    
-    // Replay the text
-    try {
-      await speakText({
-        text: sampleText,
-        lang: 'vi-VN',
-        rate: 1.0,
-      });
-    } catch (error) {
-      console.error('Error playing text:', error);
-    }
+    setCorrectWords([]);
   };
 
   // Get background color for a word
   const getWordBackground = (index: number) => {
-    if (index === currentWordIndex) {
-      return '#C9F6C9'; // Soft green for current word
+    // Blue for correct pronunciation
+    if (correctWords.includes(index)) {
+      return '#D4E7F5'; // Soft blue for correct words
     }
+    // Red for incorrect pronunciation
     if (incorrectWords.includes(index)) {
-      return '#FAD4D4'; // Soft pink for incorrect words
+      return '#FAD4D4'; // Soft red for incorrect words
     }
     return 'transparent';
   };
@@ -182,8 +248,8 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
   return (
     <div className="flex h-screen bg-[#FFF8E7]">
       {/* Sidebar */}
-      <Sidebar 
-        activePage="Nói" 
+      <Sidebar
+        activePage="Nói"
         onNavigate={onNavigate}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
@@ -196,7 +262,7 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
           {/* Speaking Content Frame */}
           <div className="w-full max-w-4xl h-full max-h-[calc(100vh-180px)] bg-[#FFF8E7] rounded-[2rem] border-2 border-[#E8DCC8] shadow-lg p-12 overflow-y-auto relative">
             {/* Timer Display */}
-            <div 
+            <div
               className="absolute top-6 right-8 text-[#555555]"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -208,7 +274,7 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
             </div>
 
             {/* Text with word highlighting */}
-            <div 
+            <div
               className="text-[#111111] mx-auto"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -224,7 +290,7 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
                 if (word.trim() === '') {
                   return word;
                 }
-                
+
                 return (
                   <span
                     key={index}
@@ -243,7 +309,7 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
 
         {/* Toolbar */}
         <div className="pb-6 flex-shrink-0">
-          <SpeakingToolbar 
+          <SpeakingToolbar
             isRecording={isRecording}
             onToggleRecording={handleToggleRecording}
             onReset={handleReset}
@@ -252,7 +318,7 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
       </main>
 
       {/* Quick Settings Drawer */}
-      <QuickSettingsDrawer 
+      <QuickSettingsDrawer
         isCollapsed={!isQuickSettingsOpen}
         onToggle={handleQuickSettingsToggle}
       />

@@ -2,6 +2,8 @@ import { Sidebar } from './Sidebar';
 import { useState, useEffect, useRef } from 'react';
 import { Upload, Search, Filter, Edit2, Trash2, Check, X } from 'lucide-react';
 import { Input } from './ui/input';
+import { api } from '../utils/api';
+import { toast } from 'sonner';
 
 interface OCRImportPageProps {
   onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
@@ -24,7 +26,7 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [editedFileName, setEditedFileName] = useState('');
   const popupRef = useRef<HTMLDivElement>(null);
-  
+
   // Sample reading files data
   const [readingFiles, setReadingFiles] = useState<ReadingFile[]>([
     { id: '1', name: 'Con bướm và bông hoa', dateAdded: '2024-10-28' },
@@ -59,17 +61,35 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (uploadedFile) {
-      // Add the file to the reading list
-      const newReading: ReadingFile = {
-        id: Date.now().toString(),
-        name: uploadedFile.name.replace(/\.[^/.]+$/, ''),
-        dateAdded: new Date().toISOString().split('T')[0],
-      };
-      setReadingFiles([newReading, ...readingFiles]);
-      setUploadedFile(null);
-      console.log('File confirmed and added:', uploadedFile.name);
+      try {
+        toast.info('Đang xử lý OCR...');
+        const response = await api.ocr.upload(uploadedFile);
+
+        if (response.error) {
+          toast.error('Lỗi OCR: ' + response.error);
+          return;
+        }
+
+        // Add the file to the reading list with extracted text
+        const newReading: ReadingFile = {
+          id: Date.now().toString(),
+          name: uploadedFile.name.replace(/\.[^/.]+$/, ''),
+          dateAdded: new Date().toISOString().split('T')[0],
+        };
+
+        setReadingFiles([newReading, ...readingFiles]);
+        setUploadedFile(null);
+        toast.success('Đã trích xuất văn bản thành công!');
+
+        // Optionally navigate to reading page with the new text
+        // if (onNavigate) onNavigate('Reading');
+
+      } catch (error) {
+        console.error('OCR Error:', error);
+        toast.error('Không thể xử lý tệp. Vui lòng thử lại.');
+      }
     }
   };
 
@@ -139,9 +159,9 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
   return (
     <div className="flex h-screen bg-[#FFF8E7]">
       {/* Sidebar */}
-      <Sidebar 
-        activePage="Nhập OCR" 
-        onNavigate={onNavigate} 
+      <Sidebar
+        activePage="Nhập OCR"
+        onNavigate={onNavigate}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
         onSignOut={onSignOut}
@@ -167,11 +187,10 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`flex items-center justify-center h-full min-h-[200px] cursor-pointer bg-[#FFFCF2] border-2 border-dashed rounded-xl p-8 transition-all ${
-                    isDragging
-                      ? 'border-[#B8D4E8] bg-[#F0F8FF]'
-                      : 'border-[#E0DCCC] hover:border-[#D0CCC0]'
-                  }`}
+                  className={`flex items-center justify-center h-full min-h-[200px] cursor-pointer bg-[#FFFCF2] border-2 border-dashed rounded-xl p-8 transition-all ${isDragging
+                    ? 'border-[#B8D4E8] bg-[#F0F8FF]'
+                    : 'border-[#E0DCCC] hover:border-[#D0CCC0]'
+                    }`}
                 >
                   <div className="flex flex-col items-center justify-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-[#FFE8CC] flex items-center justify-center">
@@ -208,11 +227,10 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
                 <button
                   onClick={handleDelete}
                   disabled={!uploadedFile}
-                  className={`w-32 h-24 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${
-                    uploadedFile
-                      ? 'bg-[#FFE8E8] border-[#FFCCCC] hover:bg-[#FFD8D8] text-[#111111]'
-                      : 'bg-[#F5F5F5] border-[#E0E0E0] text-[#999999] cursor-not-allowed'
-                  }`}
+                  className={`w-32 h-24 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${uploadedFile
+                    ? 'bg-[#FFE8E8] border-[#FFCCCC] hover:bg-[#FFD8D8] text-[#111111]'
+                    : 'bg-[#F5F5F5] border-[#E0E0E0] text-[#999999] cursor-not-allowed'
+                    }`}
                   style={{
                     fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                     fontSize: '24px',
@@ -224,11 +242,10 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
                 <button
                   onClick={handleConfirm}
                   disabled={!uploadedFile}
-                  className={`w-32 h-24 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${
-                    uploadedFile
-                      ? 'bg-[#D4E7F5] border-[#B8D4E8] hover:bg-[#C5DCF0] text-[#111111]'
-                      : 'bg-[#F5F5F5] border-[#E0E0E0] text-[#999999] cursor-not-allowed'
-                  }`}
+                  className={`w-32 h-24 rounded-xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${uploadedFile
+                    ? 'bg-[#D4E7F5] border-[#B8D4E8] hover:bg-[#C5DCF0] text-[#111111]'
+                    : 'bg-[#F5F5F5] border-[#E0E0E0] text-[#999999] cursor-not-allowed'
+                    }`}
                   style={{
                     fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                     fontSize: '24px',
@@ -276,7 +293,7 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
             >
               Danh sách bài đọc ({filteredReadings.length})
             </h2>
-            
+
             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
               {filteredReadings.map((file) => (
                 <div
@@ -306,7 +323,7 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
                         Ngày tạo: {file.dateAdded}
                       </p>
                     </div>
-                    
+
                     <div className="flex gap-3 ml-4">
                       <button
                         onClick={() => handleEditReading(file.id)}
@@ -356,7 +373,7 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
         {/* Edit Name Popup */}
         {isEditPopupOpen && (
           <div className="fixed inset-0 backdrop-blur-sm bg-[#fff8e7] bg-opacity-60 z-40 flex items-center justify-center">
-            <div 
+            <div
               ref={popupRef}
               className="bg-[#fffcf2] rounded-3xl border-2 border-[#e0dccc] shadow-2xl p-8 w-[420px]"
             >
