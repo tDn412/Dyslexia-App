@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { ReadingPage } from './components/ReadingPage';
-import { ReadingSelectionPage } from './components/ReadingSelectionPage';
+import ReadingSelectionPage from './components/ReadingSelectionPage';
 import { SpeakingPage } from './components/SpeakingPage';
 import { SpeakingSelectionPage } from './components/SpeakingSelectionPage';
 import { LibraryPage } from './components/LibraryPage';
@@ -19,6 +19,7 @@ export default function App() {
   const [showRegister, setShowRegister] = useState(false);
   const [currentPage, setCurrentPage] = useState<'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport'>('Home');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [selectedReadingId, setSelectedReadingId] = useState<string | null>(null);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -66,12 +67,33 @@ export default function App() {
   };
 
   if (currentPage === 'Reading') {
-    return <ReadingPage onNavigate={setCurrentPage} isSidebarCollapsed={isSidebarCollapsed} onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} onSignOut={handleSignOut} />;
+    // chỉ render khi selectedReadingId có giá trị
+    return selectedReadingId ? (
+      <ReadingPage
+        textid={selectedReadingId}   // <-- truyền state vào
+        onNavigate={setCurrentPage}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onSignOut={handleSignOut}
+      />
+    ) : (
+      <p>Vui lòng chọn bài đọc</p> // hoặc hiển thị loading/placeholder
+    );
   }
 
+
   if (currentPage === 'ReadingSelection') {
-    return <ReadingSelectionPage onNavigate={setCurrentPage} isSidebarCollapsed={isSidebarCollapsed} onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} onSignOut={handleSignOut} />;
+    return (
+      <ReadingSelectionPage
+        onNavigate={setCurrentPage}
+        onSelectReading={setSelectedReadingId}  // 🔥 truyền hàm chọn bài đọc
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onSignOut={handleSignOut}
+      />
+    );
   }
+
 
   if (currentPage === 'Speaking') {
     return <SpeakingPage onNavigate={setCurrentPage} isSidebarCollapsed={isSidebarCollapsed} onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} onSignOut={handleSignOut} />;
@@ -103,7 +125,9 @@ export default function App() {
 
   // Sample data for the reading preview
   const readingPreview = "Con bướm đáp nhẹ nhàng trên bông hoa đầy màu sắc. Đôi cánh của nó có màu cam và đen tươi sáng...";
-  
+
+
+
   // Sample new words from the library
   const newWords = [
     { word: "bướm", definition: "côn trùng có cánh" },
@@ -114,8 +138,8 @@ export default function App() {
   return (
     <div className="flex h-screen bg-[#FFF8E7]">
       {/* Sidebar */}
-      <Sidebar 
-        activePage={getActivePage()} 
+      <Sidebar
+        activePage={getActivePage()}
         onNavigate={setCurrentPage}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -127,7 +151,7 @@ export default function App() {
         <div className="flex-1 flex flex-col max-w-7xl mx-auto w-full px-12 py-10">
           {/* Header */}
           <div className="mb-8">
-            <h1 
+            <h1
               className="text-[#111111]"
               style={{
                 fontFamily: "'Lexend', sans-serif",
@@ -156,7 +180,7 @@ export default function App() {
               </div>
 
               {/* Title */}
-              <h2 
+              <h2
                 className="text-[#111111] mb-6"
                 style={{
                   fontFamily: "'Lexend', sans-serif",
@@ -170,7 +194,7 @@ export default function App() {
 
               {/* Content Box */}
               <div className="bg-[#FFF4E0] rounded-[27px] border-2 border-[#E8DCC8] p-6 flex-1 flex flex-col justify-between">
-                <p 
+                <p
                   className="text-[#111111] mb-4"
                   style={{
                     fontFamily: "'Lexend', sans-serif",
@@ -181,7 +205,7 @@ export default function App() {
                 >
                   {readingPreview}
                 </p>
-                <button 
+                <button
                   onClick={() => setCurrentPage('ReadingSelection')}
                   className="flex items-center gap-3 text-[#111111] hover:text-[#333333] transition-colors"
                   style={{
@@ -216,7 +240,7 @@ export default function App() {
               </div>
 
               {/* Title */}
-              <h2 
+              <h2
                 className="text-[#111111] mb-6"
                 style={{
                   fontFamily: "'Lexend', sans-serif",
@@ -229,7 +253,7 @@ export default function App() {
               </h2>
 
               {/* Sound Wave Visualization */}
-              <button 
+              <button
                 onClick={() => setCurrentPage('SpeakingSelection')}
                 className="w-full bg-[#FFE8CC] rounded-[27px] border-2 border-[#E8DCC8] p-8 flex items-center justify-center flex-1 hover:bg-[#FFE0B8] transition-colors"
               >
@@ -247,7 +271,7 @@ export default function App() {
           {/* New Words Section */}
           <div className="flex-shrink-0">
             <div className="flex items-center justify-between mb-6">
-              <h2 
+              <h2
                 className="text-[#111111]"
                 style={{
                   fontFamily: "'Lexend', sans-serif",
@@ -259,7 +283,7 @@ export default function App() {
               >
                 Từ mới
               </h2>
-              <button 
+              <button
                 onClick={() => setCurrentPage('Library')}
                 className="flex items-center gap-3.5 text-[#111111] hover:text-[#333333] transition-colors"
               >
@@ -286,11 +310,11 @@ export default function App() {
             {/* Words Carousel */}
             <div className="flex gap-6">
               {newWords.map((item, index) => (
-                <div 
+                <div
                   key={index}
                   className="bg-[#FFFCF2] rounded-[27px] border-2 border-[#E8DCC8] flex-1 h-[120px] flex items-center justify-center px-9 py-7"
                 >
-                  <p 
+                  <p
                     className="text-[#111111]"
                     style={{
                       fontFamily: "'Lexend', sans-serif",

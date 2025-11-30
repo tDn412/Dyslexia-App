@@ -6,8 +6,10 @@ import { Plus, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { speakText, stopSpeaking, pauseSpeaking, resumeSpeaking } from '../utils/textToSpeech';
 import { api } from '../utils/api';
+import { supabase } from '../lib/supabaseClient';
 
 interface ReadingPageProps {
+  textid: string; // <-- nhận id trực tiếp
   onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
   onSignOut?: () => void;
   isSidebarCollapsed?: boolean;
@@ -47,52 +49,20 @@ function ContextualToolbar({ word, position, onClose, onAddToLibrary, onToggleBo
         top: `${position.y - 60}px`,
       }}
     >
-      {/* Add to Library */}
-      <button
-        onClick={() => {
-          onAddToLibrary(word);
-          onClose();
-        }}
-        className="w-10 h-10 rounded-full bg-[#D4E7F5] hover:bg-[#C5DCF0] flex items-center justify-center transition-all shadow-sm hover:shadow-md"
-        aria-label="Add to library"
-        title="Thêm vào thư viện"
-      >
+      <button onClick={() => { onAddToLibrary(word); onClose(); }} className="w-10 h-10 rounded-full bg-[#D4E7F5] hover:bg-[#C5DCF0] flex items-center justify-center transition-all shadow-sm hover:shadow-md" aria-label="Add to library" title="Thêm vào thư viện">
         <Plus className="w-5 h-5 text-[#111111]" />
       </button>
-
-      {/* Bold Toggle */}
-      <button
-        onClick={() => {
-          onToggleBold(word);
-        }}
-        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-sm hover:shadow-md ${isBold ? 'bg-[#FFE8CC] hover:bg-[#FFDDB3]' : 'bg-[#D4E7F5] hover:bg-[#C5DCF0]'
-          }`}
-        aria-label="Toggle bold"
-        title="Đậm"
-        style={{
-          fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-        }}
-      >
+      <button onClick={() => { onToggleBold(word); }} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-sm hover:shadow-md ${isBold ? 'bg-[#FFE8CC] hover:bg-[#FFDDB3]' : 'bg-[#D4E7F5] hover:bg-[#C5DCF0]'}`} aria-label="Toggle bold" title="Đậm" style={{ fontFamily: "'OpenDyslexic', 'Lexend', sans-serif" }}>
         <span className={isBold ? 'font-bold' : ''}>B</span>
       </button>
-
-      {/* Play Word */}
-      <button
-        onClick={() => {
-          onPlayWord(word);
-          onClose();
-        }}
-        className="w-10 h-10 rounded-full bg-[#D4E7F5] hover:bg-[#C5DCF0] flex items-center justify-center transition-all shadow-sm hover:shadow-md"
-        aria-label="Play pronunciation"
-        title="Phát âm"
-      >
+      <button onClick={() => { onPlayWord(word); onClose(); }} className="w-10 h-10 rounded-full bg-[#D4E7F5] hover:bg-[#C5DCF0] flex items-center justify-center transition-all shadow-sm hover:shadow-md" aria-label="Play pronunciation" title="Phát âm">
         <Volume2 className="w-5 h-5 text-[#111111]" />
       </button>
     </div>
   );
 }
 
-export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse }: ReadingPageProps) {
+export function ReadingPage({ textid, onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse }: ReadingPageProps) {
   const [isMirrorEnabled, setIsMirrorEnabled] = useState(false);
   const [isSyllableMode, setIsSyllableMode] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
@@ -104,7 +74,6 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
 
-  // NLP Data
   const [processedSentences, setProcessedSentences] = useState<string[]>([]);
   const [processedWords, setProcessedWords] = useState<string[][]>([]);
   const [isLoadingNLP, setIsLoadingNLP] = useState(true);
@@ -112,175 +81,101 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   const readingBoxRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const lastScrollTime = useRef<number>(0);
-  const scrollThrottle = 400; // Milliseconds between line changes
+  const scrollThrottle = 400; // ms between line changes
 
-  const sampleText = `Con bướm đáp nhẹ nhàng trên bông hoa đầy màu sắc. Đôi cánh của nó có màu cam và đen tươi sáng, với những hoa văn đẹp trông giống như những ô cửa sổ nhỏ. Con bướm nghỉ ở đó một lúc, tận hưởng ánh nắng ấm áp. Đột nhiên, một cơn gió nhẹ thổi qua khu vườn. Con bướm mở và khép đôi cánh từ từ, như thể nó đang chào gió. Sau đó nó bay lên bầu trời, nhảy múa giữa những đám mây. Lũ trẻ quan sát từ bên dưới, chỉ tay và mỉm cười. Chúng thích nhìn con bướm nhảy múa trên không. Đó là một ngày hè hoàn hảo.`;
+  const [readingText, setReadingText] = useState<string>("");
 
-  // Load NLP data
+  // ---------------- LOAD TEXT FROM SUPABASE -----------------
   useEffect(() => {
+    async function fetchText() {
+      if (!textid) return;
+
+      const { data, error } = await supabase
+        .from("Text")
+        .select("content")
+        .eq("textid", textid)
+        .single();
+
+      if (error) {
+        console.error("Supabase error:", error);
+      } else {
+        setReadingText(data.content);
+      }
+    }
+
+    fetchText();
+  }, [textid]);
+
+  // ---------------- LOAD NLP -----------------
+  useEffect(() => {
+    if (!readingText) return;
+
     const loadNLP = async () => {
       try {
         setIsLoadingNLP(true);
-        const response = await api.nlp.segment(sampleText);
+        const response = await api.nlp.segment(readingText);
 
         if (response.data) {
           setProcessedSentences(response.data.sentences);
-          // Flatten words for simple display or use words_per_sentence
-          // For now, we'll just use the sentences and split locally if needed, 
-          // or use the words_per_sentence if provided.
-          // The API returns words_per_sentence: string[][]
           setProcessedWords(response.data.words_per_sentence);
         } else {
-          // Fallback if API fails
-          setProcessedSentences(sampleText.match(/[^.!?]+[.!?]+/g) || [sampleText]);
+          setProcessedSentences(readingText.match(/[^.!?]+[.!?]+/g) || [readingText]);
         }
       } catch (error) {
-        console.error('NLP Error:', error);
-        // Fallback
-        setProcessedSentences(sampleText.match(/[^.!?]+[.!?]+/g) || [sampleText]);
+        console.error("NLP Error:", error);
+        setProcessedSentences(readingText.match(/[^.!?]+[.!?]+/g) || [readingText]);
       } finally {
         setIsLoadingNLP(false);
       }
     };
 
     loadNLP();
-  }, []);
+  }, [readingText]);
 
   // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      stopSpeaking();
-    };
-  }, []);
+  useEffect(() => { return () => stopSpeaking(); }, []);
 
   const handleWordClick = (word: string, event: React.MouseEvent) => {
     const rect = (event.target as HTMLElement).getBoundingClientRect();
     setSelectedWord(word);
-    setToolbarPosition({
-      x: rect.left + rect.width / 2 - 70,
-      y: rect.top,
-    });
+    setToolbarPosition({ x: rect.left + rect.width / 2 - 70, y: rect.top });
   };
 
-  const handleAddToLibrary = (word: string) => {
-    toast.success(`"${word}" đã được thêm vào thư viện!`);
-  };
-
-  const handleToggleBold = (word: string) => {
-    setBoldWords(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(word)) {
-        newSet.delete(word);
-      } else {
-        newSet.add(word);
-      }
-      return newSet;
-    });
-  };
-
-  const handlePlayWord = async (word: string) => {
-    try {
-      await speakText({
-        text: word,
-        lang: 'vi-VN',
-        rate: 1.0,
-      });
-    } catch (error) {
-      console.error('Error playing word:', error);
-      toast.error('Không thể phát âm. Vui lòng thử lại.');
-    }
-  };
+  const handleAddToLibrary = (word: string) => toast.success(`"${word}" đã được thêm vào thư viện!`);
+  const handleToggleBold = (word: string) => setBoldWords(prev => { const newSet = new Set(prev); newSet.has(word) ? newSet.delete(word) : newSet.add(word); return newSet; });
+  const handlePlayWord = async (word: string) => { try { await speakText({ text: word, lang: 'vi-VN', rate: 1.0 }); } catch { toast.error('Không thể phát âm. Vui lòng thử lại.'); } };
 
   const handlePlayText = async () => {
-    // If paused, resume
-    if (isPaused) {
-      resumeSpeaking();
-      setIsPaused(false);
-      return;
-    }
+    if (isPaused) { resumeSpeaking(); setIsPaused(false); return; }
+    if (isPlaying) { pauseSpeaking(); setIsPaused(true); return; }
 
-    // If playing, pause
-    if (isPlaying) {
-      pauseSpeaking();
-      setIsPaused(true);
-      return;
-    }
-
-    // Start new playback
-    setIsPlaying(true);
-    setIsPaused(false);
-
-    try {
-      await speakText({
-        text: sampleText,
-        lang: 'vi-VN',
-        rate: 1.0,
-      });
-    } catch (error) {
-      console.error('Error playing text:', error);
-      toast.error('Không thể phát âm. Vui lòng thử lại.');
-    } finally {
-      setIsPlaying(false);
-      setIsPaused(false);
-    }
+    setIsPlaying(true); setIsPaused(false);
+    try { await speakText({ text: readingText, lang: 'vi-VN', rate: 1.0 }); }
+    catch { toast.error('Không thể phát âm. Vui lòng thử lại.'); }
+    finally { setIsPlaying(false); setIsPaused(false); }
   };
 
-  // Highlight mirror letters within a word
   const highlightMirrorLetters = (text: string) => {
     if (!isMirrorEnabled) return text;
-
-    const chars = text.split('');
-    return chars.map((char, idx) => {
+    return text.split('').map((char, idx) => {
       const lowerChar = char.toLowerCase();
-
-      // Check for m/n/u group
-      if (['m', 'n', 'u'].includes(lowerChar)) {
-        return (
-          <span
-            key={idx}
-            className="rounded px-0.5"
-            style={{ backgroundColor: '#CBE7FF' }}
-          >
-            {char}
-          </span>
-        );
-      }
-
-      // Check for q/p/b/d group
-      if (['q', 'p', 'b', 'd'].includes(lowerChar)) {
-        return (
-          <span
-            key={idx}
-            className="rounded px-0.5"
-            style={{ backgroundColor: '#FAD4D4' }}
-          >
-            {char}
-          </span>
-        );
-      }
-
+      if (['m', 'n', 'u'].includes(lowerChar)) return <span key={idx} style={{ backgroundColor: '#CBE7FF' }}>{char}</span>;
+      if (['q', 'p', 'b', 'd'].includes(lowerChar)) return <span key={idx} style={{ backgroundColor: '#FAD4D4' }}>{char}</span>;
       return char;
     });
   };
 
-  // Split text into interactive words
-  const renderInteractiveText = () => {
+  // --- Render text with interactive words ---
+  const renderInteractiveText = (): React.ReactNode => {
     if (isLoadingNLP) return <p>Đang tải văn bản...</p>;
 
-    // Use processed sentences to render
     return processedSentences.map((sentence, sIdx) => {
-      // If we have word data from NLP, use it. Otherwise split locally.
       const words = processedWords[sIdx] || sentence.split(/(\s+)/);
 
       return (
         <span key={sIdx}>
           {words.map((segment, wIdx) => {
             const trimmedWord = segment.trim();
-            // Add space after words if using NLP words array (which usually doesn't include spaces)
-            // Simple heuristic: if segment is a word, add space.
-            // However, processedWords from API likely contains just words.
-            // We need to be careful about spacing.
-            // For simplicity, if using processedWords, we add a space after each word.
 
             if (!trimmedWord) return <span key={wIdx}>{segment}</span>;
 
@@ -297,7 +192,6 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
                 >
                   {highlightMirrorLetters(segment)}
                 </span>
-                {/* Add space if using processedWords array directly */}
                 {processedWords[sIdx] ? ' ' : ''}
               </span>
             );
@@ -307,8 +201,21 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     });
   };
 
-  // Render text in Focus Mode (line by line)
-  const renderFocusModeText = () => {
+  // --- Tính opacity cho mỗi dòng trong Focus Mode ---
+  const getLineOpacity = (lineIndex: number): number => {
+    if (!isFocusMode) return 1;
+
+    const distance = Math.abs(lineIndex - currentLineIndex);
+
+    if (distance === 0) return 1;       // dòng hiện tại - full opacity
+    if (distance === 1) return 0.25;    // dòng kế bên - mờ hơn
+    if (distance === 2) return 0.12;    // cách 2 dòng - mờ hơn
+    return 0.08;                         // các dòng xa - mờ hơn nhiều
+  };
+
+
+  // --- Render text in Focus Mode (line by line) ---
+  const renderFocusModeText = (): React.ReactNode => {
     if (isLoadingNLP) return <p>Đang tải văn bản...</p>;
 
     return processedSentences.map((sentence, index) => {
@@ -355,182 +262,24 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     });
   };
 
-  const handleQuickSettingsToggle = () => {
-    if (!isQuickSettingsOpen && !isSidebarCollapsed) {
-      // Opening quick settings - collapse left sidebar
-      onToggleCollapse?.();
-    }
-    setIsQuickSettingsOpen(!isQuickSettingsOpen);
-  };
-
-  // Auto-scroll to center the current line in Focus Mode
-  useEffect(() => {
-    if (isFocusMode && readingBoxRef.current && lineRefs.current[currentLineIndex]) {
-      const container = readingBoxRef.current;
-      const currentLine = lineRefs.current[currentLineIndex];
-
-      if (currentLine) {
-        const containerHeight = container.clientHeight;
-        const lineTop = currentLine.offsetTop;
-        const lineHeight = currentLine.clientHeight;
-
-        // Calculate scroll position to center the line
-        const scrollTo = lineTop - (containerHeight / 2) + (lineHeight / 2);
-
-        container.scrollTo({
-          top: scrollTo,
-          behavior: 'smooth'
-        });
-      }
-    }
-  }, [currentLineIndex, isFocusMode]);
-
-  // Handle keyboard navigation in Focus Mode
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isFocusMode) return;
-
-      if (event.key === 'Escape') {
-        setIsFocusMode(false);
-      } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
-        event.preventDefault();
-        handlePreviousLine();
-      } else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
-        event.preventDefault();
-        handleNextLine();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFocusMode, currentLineIndex, processedSentences.length]);
-
-  // Handle mouse wheel scrolling in Focus Mode
-  useEffect(() => {
-    const handleWheel = (event: WheelEvent) => {
-      if (!isFocusMode) return;
-
-      // Prevent default scrolling behavior in Focus Mode
-      event.preventDefault();
-
-      // Throttle: only change line if enough time has passed
-      const now = Date.now();
-      if (now - lastScrollTime.current < scrollThrottle) {
-        return;
-      }
-
-      lastScrollTime.current = now;
-
-      // Determine scroll direction
-      if (event.deltaY > 0) {
-        // Scrolling down - next line
-        handleNextLine();
-      } else if (event.deltaY < 0) {
-        // Scrolling up - previous line
-        handlePreviousLine();
-      }
-    };
-
-    const readingBox = readingBoxRef.current;
-    if (readingBox && isFocusMode) {
-      readingBox.addEventListener('wheel', handleWheel, { passive: false });
-    }
-
-    return () => {
-      if (readingBox) {
-        readingBox.removeEventListener('wheel', handleWheel);
-      }
-    };
-  }, [isFocusMode, currentLineIndex, processedSentences.length]);
-
-  // Calculate opacity for each line in Focus Mode
-  const getLineOpacity = (lineIndex: number) => {
-    if (!isFocusMode) return 1;
-
-    const distance = Math.abs(lineIndex - currentLineIndex);
-
-    if (distance === 0) return 1; // Current line - full opacity
-    if (distance === 1) return 0.25; // Adjacent lines - mờ hơn gấp đôi
-    if (distance === 2) return 0.12; // 2 lines away - mờ hơn gấp đôi
-    return 0.08; // Distant lines - mờ hơn gấp đôi
-  };
-
-  // Navigate to previous line in Focus Mode
-  const handlePreviousLine = () => {
-    if (isFocusMode) {
-      setCurrentLineIndex((prev) => Math.max(0, prev - 1));
-    }
-  };
-
-  // Navigate to next line in Focus Mode
-  const handleNextLine = () => {
-    if (isFocusMode) {
-      setCurrentLineIndex((prev) => Math.min(processedSentences.length - 1, prev + 1));
-    }
-  };
-
   return (
     <div className="flex h-screen bg-[#FFF8E7]">
-      {/* Sidebar */}
-      <Sidebar
-        activePage="Đọc"
-        onNavigate={onNavigate}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={onToggleCollapse}
-        onSignOut={onSignOut}
-      />
-
-      {/* Main Content */}
+      <Sidebar activePage="Đọc" onNavigate={onNavigate} isCollapsed={isSidebarCollapsed} onToggleCollapse={onToggleCollapse} onSignOut={onSignOut} />
       <main className="flex-1 overflow-hidden flex flex-col h-screen">
         <div className="flex-1 flex items-center justify-center px-12 pt-8 pb-4 overflow-hidden">
-          {/* Reading Content Frame */}
-          <div
-            ref={readingBoxRef}
-            className={`w-full max-w-4xl h-full max-h-[calc(100vh-180px)] bg-[#FFF8E7] rounded-[2rem] border-2 border-[#E8DCC8] shadow-lg p-12 relative ${isFocusMode ? 'focus-mode-active overflow-hidden' : 'overflow-y-auto'
-              }`}
-          >
-            <div
-              className="text-[#111111] mx-auto select-none"
-              style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '26px',
-                lineHeight: '1.8',
-                letterSpacing: '0.14em',
-                maxWidth: '66ch',
-                wordSpacing: '0.16em',
-              }}
-            >
+          <div ref={readingBoxRef} className={`w-full max-w-4xl h-full max-h-[calc(100vh-180px)] bg-[#FFF8E7] rounded-[2rem] border-2 border-[#E8DCC8] shadow-lg p-12 relative ${isFocusMode ? 'focus-mode-active overflow-hidden' : 'overflow-y-auto'}`}>
+            <div style={{ fontFamily: "'OpenDyslexic','Lexend',sans-serif", fontSize: '26px', lineHeight: 1.8, maxWidth: '66ch', wordSpacing: '0.16em' }}>
               {isFocusMode ? renderFocusModeText() : renderInteractiveText()}
             </div>
-
-            {/* Focus Mode Gradient Overlays */}
-            {isFocusMode && (
-              <>
-                <div
-                  className="absolute top-0 left-0 right-0 h-24 pointer-events-none"
-                  style={{
-                    background: 'linear-gradient(to bottom, #FFF8E7 0%, transparent 100%)',
-                  }}
-                />
-                <div
-                  className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"
-                  style={{
-                    background: 'linear-gradient(to top, #FFF8E7 0%, transparent 100%)',
-                  }}
-                />
-              </>
-            )}
           </div>
         </div>
-
-        {/* Toolbar */}
         <div className="pb-6 flex-shrink-0">
           <ReadingToolbar
             onToggleMirror={setIsMirrorEnabled}
             onToggleSyllable={setIsSyllableMode}
             onToggleFocusMode={setIsFocusMode}
-            onPreviousLine={handlePreviousLine}
-            onNextLine={handleNextLine}
+            onPreviousLine={() => setCurrentLineIndex(prev => Math.max(0, prev - 1))}
+            onNextLine={() => setCurrentLineIndex(prev => Math.min(processedSentences.length - 1, prev + 1))}
             onPlayText={handlePlayText}
             isMirrorEnabled={isMirrorEnabled}
             isSyllableMode={isSyllableMode}
@@ -538,26 +287,9 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
             isPlaying={isPlaying || isPaused}
           />
         </div>
-
-        {/* Contextual Toolbar */}
-        {selectedWord && (
-          <ContextualToolbar
-            word={selectedWord}
-            position={toolbarPosition}
-            onClose={() => setSelectedWord(null)}
-            onAddToLibrary={handleAddToLibrary}
-            onToggleBold={handleToggleBold}
-            onPlayWord={handlePlayWord}
-            isBold={boldWords.has(selectedWord)}
-          />
-        )}
+        {selectedWord && <ContextualToolbar word={selectedWord} position={toolbarPosition} onClose={() => setSelectedWord(null)} onAddToLibrary={handleAddToLibrary} onToggleBold={handleToggleBold} onPlayWord={handlePlayWord} isBold={boldWords.has(selectedWord)} />}
       </main>
-
-      {/* Quick Settings Drawer */}
-      <QuickSettingsDrawer
-        isCollapsed={!isQuickSettingsOpen}
-        onToggle={handleQuickSettingsToggle}
-      />
+      <QuickSettingsDrawer isCollapsed={!isQuickSettingsOpen} onToggle={() => setIsQuickSettingsOpen(prev => !prev)} />
     </div>
   );
 }

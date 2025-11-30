@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "node -r dotenv/config --import tsx/esm src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
@@ -13,6 +13,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "dotevn": "^0.0.1-security",
     "express": "^4.21.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
@@ -28,5 +29,3 @@
     "typescript": "^5.6.3"
   }
 }
-
-

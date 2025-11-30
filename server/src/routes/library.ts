@@ -1,123 +1,124 @@
 import { Router } from 'express';
+import { supabase } from '../utils/supabaseClient'; 
+import { NextFunction, Request, Response } from 'express';
 
 export const router = Router();
 
+// Kiểu dữ liệu Supabase
 type Word = {
-  id: string;
-  text: string;
-  userId: string;
-  dateAdded: string;
+  wordid: string; 
+  word: string;
+  userid: string; 
+  createdat: string; 
 };
 
-// In-memory words storage
-const words = new Map<string, Word>();
-const wordsByUser = new Map<string, Word[]>();
+// ======================= GET /words =======================
+router.get('/words', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'u003';
+    const searchQuery = (req.query.search as string) || '';
+    const letterFilter = req.query.letter as string | undefined;
 
-// Helper to get words for a user
-function getUserWords(userId: string): Word[] {
-  return Array.from(words.values()).filter(w => w.userId === userId);
-}
+    let query = supabase
+      .from('LibraryWord')
+      .select('wordid, word, userid, createdat')
+      .eq('userid', userId)
+      .order('createdat', { ascending: false });
 
-// GET /api/library/words - Get all words for user (with optional search and filter)
-router.get('/words', (req, res) => {
-  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'demo';
-  const searchQuery = (req.query.search as string) || '';
-  const letterFilter = req.query.letter as string | undefined;
-  
-  let userWords = getUserWords(userId);
-  
-  // Apply search filter
-  if (searchQuery) {
-    userWords = userWords.filter(w => 
-      w.text.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    if (searchQuery) query = query.ilike('word', `%${searchQuery}%`);
+    if (letterFilter) query = query.ilike('word', `${letterFilter}%`);
+
+    const { data: userWords, error } = await query;
+
+    if (error) throw error;
+
+    // Map lại dữ liệu để frontend dùng
+    const mapped = userWords.map((w) => ({
+      id: w.wordid,
+      text: w.word,
+      dateAdded: w.createdat,
+    }));
+
+    res.json(mapped);
+
+  } catch (err) {
+    console.error('Error fetching words:', err);
+    next(err);
   }
-  
-  // Apply letter filter
-  if (letterFilter) {
-    userWords = userWords.filter(w => 
-      w.text.charAt(0).toUpperCase() === letterFilter.toUpperCase()
-    );
-  }
-  
-  // Sort by dateAdded descending
-  userWords.sort((a, b) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime());
-  
-  res.json(userWords);
 });
 
-// POST /api/library/words - Add a new word
-router.post('/words', (req, res) => {
-  const userId = (req.body.userId as string) || (req.headers['x-user-id'] as string) || 'demo';
+// ======================= POST /words =======================
+router.post('/words', async (req: Request, res: Response, next: NextFunction) => {
+  const userId = (req.body.userId as string) || (req.headers['x-user-id'] as string);
   const { text } = req.body ?? {};
-  
-  if (!text || !text.trim()) {
-    return res.status(400).json({ error: 'text is required' });
+
+  if (!userId) return res.status(400).json({ error: 'userId is required' });
+  if (!text || !text.trim()) return res.status(400).json({ error: 'text is required' });
+  if (text.length > 15) return res.status(400).json({ error: 'text must be 15 characters or less' });
+
+  try {
+    // Kiểm tra từ đã tồn tại chưa
+    const { data: existingWord, error: selectError } = await supabase
+      .from('LibraryWord')
+      .select('wordid')
+      .eq('userid', userId)
+      .eq('word', text.trim())
+      .limit(1);
+
+    if (selectError) throw selectError;
+    if (existingWord && existingWord.length > 0) return res.status(409).json({ error: 'word already exists' });
+
+    // Thêm từ mới
+    const { data: newWord, error: insertError } = await supabase
+      .from('LibraryWord')
+      .insert({
+        word: text.trim(),
+        userid: userId,
+        createdat: new Date().toISOString(),
+      })
+      .select();
+
+    if (insertError) throw insertError;
+
+    // Map dữ liệu trả về frontend
+    res.status(201).json({
+      id: newWord[0].wordid,
+      text: newWord[0].word,
+      dateAdded: newWord[0].createdat,
+    });
+
+  } catch (err) {
+    console.error('Error adding word:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-  
-  if (text.length > 15) {
-    return res.status(400).json({ error: 'text must be 15 characters or less' });
-  }
-  
-  // Check if word already exists for this user
-  const existingWords = getUserWords(userId);
-  if (existingWords.some(w => w.text.toLowerCase() === text.toLowerCase())) {
-    return res.status(409).json({ error: 'word already exists' });
-  }
-  
-  const id = `w_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const word: Word = {
-    id,
-    text: text.trim(),
-    userId,
-    dateAdded: new Date().toISOString(),
-  };
-  
-  words.set(id, word);
-  
-  // Update user words cache
-  const userWordsList = wordsByUser.get(userId) || [];
-  userWordsList.push(word);
-  wordsByUser.set(userId, userWordsList);
-  
-  res.status(201).json(word);
 });
 
-// DELETE /api/library/words/:id - Delete a word
-router.delete('/words/:id', (req, res) => {
-  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'demo';
-  const word = words.get(req.params.id);
-  
-  if (!word) {
-    return res.status(404).json({ error: 'word not found' });
+// ======================= DELETE /words/:id =======================
+router.delete('/words/:id', async (req: Request, res: Response, next: NextFunction) => {
+  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'u003';
+  const wordId = req.params.id;
+
+  try {
+    const { error } = await supabase
+      .from('LibraryWord')
+      .delete()
+      .eq('wordid', wordId)
+      .eq('userid', userId);
+
+    if (error) throw error;
+
+    res.status(204).send(); // Xóa thành công
+  } catch (err) {
+    console.error('Error deleting word:', err);
+    next(err);
   }
-  
-  if (word.userId !== userId) {
-    return res.status(403).json({ error: 'forbidden' });
-  }
-  
-  words.delete(req.params.id);
-  
-  // Update user words cache
-  const userWordsList = wordsByUser.get(userId) || [];
-  const index = userWordsList.findIndex(w => w.id === req.params.id);
-  if (index !== -1) {
-    userWordsList.splice(index, 1);
-    wordsByUser.set(userId, userWordsList);
-  }
-  
-  res.status(204).send();
 });
 
-// POST /api/library/words/pronounce - Get pronunciation (stub)
+// ======================= POST /words/pronounce =======================
 router.post('/words/pronounce', (req, res) => {
   const { word } = req.body ?? {};
-  if (!word) {
-    return res.status(400).json({ error: 'word is required' });
-  }
-  // In a real app, this would return audio URL or trigger TTS
+  if (!word) return res.status(400).json({ error: 'word is required' });
+
+  // Đây là logic stub
   res.json({ word, audioUrl: null, message: 'pronunciation requested' });
 });
-
-
-
