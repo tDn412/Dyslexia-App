@@ -20,6 +20,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport'>('Home');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedReadingId, setSelectedReadingId] = useState<string | null>(null);
+  const [selectedSpeakingId, setSelectedSpeakingId] = useState<string | null>(null);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -96,11 +97,35 @@ export default function App() {
 
 
   if (currentPage === 'Speaking') {
-    return <SpeakingPage onNavigate={setCurrentPage} isSidebarCollapsed={isSidebarCollapsed} onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} onSignOut={handleSignOut} />;
+    // chỉ render khi selectedReadingId có giá trị
+    return selectedSpeakingId ? (
+      <SpeakingPage
+        textid={selectedSpeakingId}   // <-- truyền state vào
+        onNavigate={setCurrentPage}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onSignOut={handleSignOut}
+      />
+    ) : (
+      <p>Vui lòng chọn bài nói</p> // hoặc hiển thị loading/placeholder
+    );
   }
 
   if (currentPage === 'SpeakingSelection') {
-    return <SpeakingSelectionPage onNavigate={setCurrentPage} isSidebarCollapsed={isSidebarCollapsed} onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} onSignOut={handleSignOut} />;
+    return (
+      <SpeakingSelectionPage
+        onNavigate={setCurrentPage}
+        onSelectSpeaking={(id: string) => {
+          console.log("SET SPEAKING ID:", id);
+          setSelectedSpeakingId(id);   // 1. Set ID
+          setCurrentPage("Speaking");  // 2. Điều hướng ngay sau đó
+        }}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onSignOut={handleSignOut}
+      />
+
+    );
   }
 
   if (currentPage === 'Library') {

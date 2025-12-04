@@ -1,3 +1,4 @@
+// --- LOAD READING TEXT FROM SUPABASE FOR SPEAKING PAGE ---
 import { Sidebar } from './Sidebar';
 import { SpeakingToolbar } from './SpeakingToolbar';
 import { QuickSettingsDrawer } from './QuickSettingsDrawer';
@@ -6,15 +7,17 @@ import { AudioRecorder } from '../utils/recording';
 import { toast } from 'sonner';
 import { speakText, stopSpeaking, pauseSpeaking, resumeSpeaking, isPaused as checkIsPaused } from '../utils/textToSpeech';
 import { api } from '../utils/api';
+import { supabase } from '../lib/supabaseClient';
 
 interface SpeakingPageProps {
+  textid: string; // <-- nhận id trực tiếp
   onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
   onSignOut?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
 
-export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse }: SpeakingPageProps) {
+export function SpeakingPage({ textid, onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse }: SpeakingPageProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
@@ -26,11 +29,32 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
   const [isPaused, setIsPaused] = useState(false);
   const playbackAbortRef = useRef<boolean>(false);
 
-  // Sample text split into words
-  const sampleText = `Con bướm đáp nhẹ nhàng trên bông hoa đầy màu sắc. Đôi cánh của nó có màu cam và đen tươi sáng, với những hoa văn đẹp trông giống như những ô cửa sổ nhỏ. Con bướm nghỉ ở đó một lúc, tận hưởng ánh nắng ấm áp. Đột nhiên, một cơn gió nhẹ thổi qua khu vườn. Con bướm mở và khép đôi cánh từ từ, như thể nó đang chào gió. Sau đó nó bay lên bầu trời, nhảy múa giữa những đám mây. Lũ trẻ quan sát từ bên dưới, chỉ tay và mỉm cười. Chúng thích nhìn con bướm nhảy múa trên không. Đó là một ngày hè hoàn hảo.`;
+  // --- NEW: STATE TO STORE READING TEXT FROM SUPABASE ---
+  const [speakingText, setSpeakingText] = useState<string>("");
 
-  // Split text into words, preserving punctuation
-  const words = sampleText.split(/(\s+)/);
+  // --- NEW: LOAD TEXT FROM SUPABASE /api/text/get ---
+  useEffect(() => {
+    async function fetchText() {
+      if (!textid) return;
+
+      const { data, error } = await supabase
+        .from("Text")
+        .select("content")
+        .eq("textid", textid)
+        .single();
+
+      if (error) {
+        console.error("Supabase error:", error);
+      } else {
+        setSpeakingText(data.content);
+      }
+    }
+
+    fetchText();
+  }, [textid]);
+
+  // --- SPLIT INTO WORDS AFTER LOADING ---
+  const words = speakingText ? speakingText.split(/(\s+)/) : [];
 
   // Initialize recorder
   useEffect(() => {
@@ -42,14 +66,10 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
           setIsRecording(false);
         },
       });
-    } else {
-      console.warn('MediaRecorder is not supported');
     }
 
     return () => {
-      if (recorderRef.current) {
-        recorderRef.current.stop().catch(() => { });
-      }
+      recorderRef.current?.stop().catch(() => { });
     };
   }, []);
 
@@ -70,149 +90,80 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
     };
   }, [isRecording]);
 
-  // Cleanup on unmount or navigation
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopSpeaking();
-      playbackAbortRef.current = true;
+      stopSpeaking();                   // <<< KHÔNG return gì
+      playbackAbortRef.current = true;  // <<< cleanup OK
     };
   }, []);
 
-  // Format time as MM:SS
+
+  // Format time
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
+  // --- MAIN RECORDING HANDLER (UNCHANGED) ---
   const handleToggleRecording = async () => {
     if (!recorderRef.current) {
-      toast.error('Microphone không được hỗ trợ. Vui lòng sử dụng trình duyệt khác.');
+      toast.error("Microphone không được hỗ trợ.");
       return;
     }
 
     try {
       if (isRecording) {
-        // Stop recording
         const audioBlob = await recorderRef.current.stop();
         setIsRecording(false);
-        toast.success('Đã dừng ghi âm. Đang phân tích...');
+        toast.success("Đã dừng ghi âm. Đang phân tích...");
 
-        // Send to backend for analysis
-        try {
-          const response = await api.pronunciation.check(sampleText, audioBlob);
+        const response = await api.pronunciation.check(speakingText, audioBlob);
 
-          if (response.data && response.data.word_scores) {
-            console.log('✅ Pronunciation API Response:', response.data);
-            toast.success('Phân tích hoàn tất!');
+        if (response.data?.word_scores) {
+          const scores = response.data.word_scores;
 
-            // Map response to incorrect words
-            const scores = response.data.word_scores;
-            console.log('📊 Word Scores:', scores);
+          const lowScoreIndices: number[] = [];
+          const correctIndices: number[] = [];
 
-            const lowScoreIndices: number[] = [];
-            const correctIndices: number[] = [];
-
-            // Simple mapping strategy: iterate through our `words` array (which includes spaces)
-            // and match with `scores` array (which likely doesn't).
-            let scoreIndex = 0;
-            words.forEach((word, index) => {
-              if (word.trim() === '') return;
-
-              if (scoreIndex < scores.length) {
-                const scoreData = scores[scoreIndex];
-                console.log(`Word "${word}" (index ${index}): score = ${scoreData.pronunciation_score}`);
-
-                // Threshold for "incorrect" (e.g., < 80)
-                if (scoreData.pronunciation_score < 80) {
-                  lowScoreIndices.push(index);
-                } else {
-                  correctIndices.push(index);
-                }
-                scoreIndex++;
-              }
-            });
-
-            console.log('❌ Incorrect word indices:', lowScoreIndices);
-            console.log('✅ Correct word indices:', correctIndices);
-
-            setIncorrectWords(lowScoreIndices);
-            setCorrectWords(correctIndices);
-
-            if (lowScoreIndices.length === 0) {
-              toast.success('Phát âm tuyệt vời!');
-            } else {
-              toast.info(`Bạn cần cải thiện ${lowScoreIndices.length} từ.`);
-            }
-          } else {
-            // Backend failed or word_scores missing - use simulation for demo
-            console.warn('⚠️ Backend failed or word scores missing, using simulation');
-            toast.warning('Backend không khả dụng hoặc dữ liệu không đầy đủ. Đang hiển thị kết quả mô phỏng.');
-
-            // Simulate: randomly mark some words as correct (blue) and some as incorrect (red)
-            const lowScoreIndices: number[] = [];
-            const correctIndices: number[] = [];
-
-            let wordCount = 0;
-            words.forEach((word, index) => {
-              if (word.trim() === '') return;
-
-              // Simulate: every 3rd word is "incorrect", others are "correct"
-              if (wordCount % 3 === 0) {
+          let scoreIndex = 0;
+          words.forEach((word, index) => {
+            if (word.trim() === '') return;
+            if (scoreIndex < scores.length) {
+              if (scores[scoreIndex].pronunciation_score < 80)
                 lowScoreIndices.push(index);
-              } else {
-                correctIndices.push(index);
-              }
-              wordCount++;
-            });
+              else correctIndices.push(index);
+              scoreIndex++;
+            }
+          });
 
-            console.log('🎭 Simulated incorrect indices:', lowScoreIndices);
-            console.log('🎭 Simulated correct indices:', correctIndices);
-
-            setIncorrectWords(lowScoreIndices);
-            setCorrectWords(correctIndices);
-            toast.info(`(Mô phỏng) Bạn cần cải thiện ${lowScoreIndices.length} từ.`);
-          }
-        } catch (apiError) {
-          console.error('API Analysis Error:', apiError);
-          toast.error('Không thể phân tích phát âm. Vui lòng thử lại.');
+          setIncorrectWords(lowScoreIndices);
+          setCorrectWords(correctIndices);
         }
 
       } else {
-        // Start recording
         await recorderRef.current.start();
         setIsRecording(true);
-        setSeconds(0);
         setIncorrectWords([]);
         setCorrectWords([]);
         setCurrentWordIndex(0);
-        toast.success('Bắt đầu ghi âm...');
+        setSeconds(0);
+        toast.success("Bắt đầu ghi âm...");
       }
-    } catch (error) {
-      console.error('Recording error:', error);
-      if (error instanceof Error) {
-        if (error.message.includes('Permission')) {
-          toast.error('Vui lòng cho phép truy cập microphone.');
-        } else {
-          toast.error('Không thể bắt đầu ghi âm. Vui lòng thử lại.');
-        }
-      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Không thể ghi âm.");
       setIsRecording(false);
     }
   };
 
   const handleReset = async () => {
-    // Stop any ongoing playback
     stopSpeaking();
     playbackAbortRef.current = true;
 
-    // Stop recording if active
-    if (isRecording && recorderRef.current) {
-      try {
-        await recorderRef.current.stop();
-      } catch (error) {
-        console.error('Error stopping recorder:', error);
-      }
+    if (isRecording) {
+      await recorderRef.current?.stop();
     }
 
     setIsRecording(false);
@@ -224,22 +175,15 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
     setCorrectWords([]);
   };
 
-  // Get background color for a word
+  // Background color
   const getWordBackground = (index: number) => {
-    // Blue for correct pronunciation
-    if (correctWords.includes(index)) {
-      return '#D4E7F5'; // Soft blue for correct words
-    }
-    // Red for incorrect pronunciation
-    if (incorrectWords.includes(index)) {
-      return '#FAD4D4'; // Soft red for incorrect words
-    }
-    return 'transparent';
+    if (correctWords.includes(index)) return "#D4E7F5";
+    if (incorrectWords.includes(index)) return "#FAD4D4";
+    return "transparent";
   };
 
   const handleQuickSettingsToggle = () => {
     if (!isQuickSettingsOpen && !isSidebarCollapsed) {
-      // Opening quick settings - collapse left sidebar
       onToggleCollapse?.();
     }
     setIsQuickSettingsOpen(!isQuickSettingsOpen);
@@ -247,7 +191,6 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
 
   return (
     <div className="flex h-screen bg-[#FFF8E7]">
-      {/* Sidebar */}
       <Sidebar
         activePage="Nói"
         onNavigate={onNavigate}
@@ -256,26 +199,18 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
         onSignOut={onSignOut}
       />
 
-      {/* Main Content */}
       <main className="flex-1 overflow-hidden flex flex-col h-screen">
         <div className="flex-1 flex items-center justify-center px-12 pt-8 pb-4 overflow-hidden">
-          {/* Speaking Content Frame */}
-          <div className="w-full max-w-4xl h-full max-h-[calc(100vh-180px)] bg-[#FFF8E7] rounded-[2rem] border-2 border-[#E8DCC8] shadow-lg p-12 overflow-y-auto relative">
-            {/* Timer Display */}
-            <div
-              className="absolute top-6 right-8 text-[#555555]"
-              style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '20px',
-                letterSpacing: '0.02em',
-              }}
-            >
+          <div className="w-full max-w-4xl h-full max-h-[calc(100vh-180px)] 
+              bg-[#FFF8E7] rounded-[2rem] border-2 border-[#E8DCC8] shadow-lg 
+              p-12 overflow-y-auto relative">
+
+            <div className="absolute top-6 right-8 text-[#555] text-[20px]">
               {formatTime(seconds)}
             </div>
 
-            {/* Text with word highlighting */}
             <div
-              className="text-[#111111] mx-auto"
+              className="text-[#111] mx-auto"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                 fontSize: '26px',
@@ -285,29 +220,23 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
                 wordSpacing: '0.16em',
               }}
             >
-              {words.map((word, index) => {
-                // Skip rendering whitespace as separate elements
-                if (word.trim() === '') {
-                  return word;
-                }
-
-                return (
+              {words.map((word, index) =>
+                word.trim() === '' ? (
+                  word
+                ) : (
                   <span
                     key={index}
-                    className="rounded-md px-1 transition-colors duration-200"
-                    style={{
-                      backgroundColor: getWordBackground(index),
-                    }}
+                    className="rounded-md px-1 transition-colors"
+                    style={{ backgroundColor: getWordBackground(index) }}
                   >
                     {word}
                   </span>
-                );
-              })}
+                )
+              )}
             </div>
           </div>
         </div>
 
-        {/* Toolbar */}
         <div className="pb-6 flex-shrink-0">
           <SpeakingToolbar
             isRecording={isRecording}
@@ -317,7 +246,6 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
         </div>
       </main>
 
-      {/* Quick Settings Drawer */}
       <QuickSettingsDrawer
         isCollapsed={!isQuickSettingsOpen}
         onToggle={handleQuickSettingsToggle}

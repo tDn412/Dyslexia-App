@@ -39,33 +39,36 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   // Load words from backend on mount
   useEffect(() => {
     const loadWords = async () => {
+      setIsLoadingWords(true);
+
+      // thử load từ localStorage trước
+      const cached = localStorage.getItem('words');
+      if (cached) {
+        setWords(JSON.parse(cached).map((w: any) => ({
+          ...w,
+          dateAdded: new Date(w.dateAdded)
+        })));
+        setIsLoadingWords(false);
+        return;
+      }
+
       try {
-        setIsLoadingWords(true);
         const response = await api.library.getWords();
-        if (response.data) {
+        console.log("RAW RESPONSE:", response);
+
+        if (response.data && response.data.length > 0) {
           const loadedWords = response.data.map((w: any) => ({
-            id: w.wordid,                  // <-- từ wordid của backend
-            text: w.word,                  // <-- từ word của backend
-            dateAdded: new Date(w.createdat) // <-- từ createdat của backend
+            id: w.id,
+            text: w.text,
+            dateAdded: new Date(w.dateAdded)
           }));
+
           setWords(loadedWords);
-        } else if (response.error) {
-          console.error('Error loading words:', response.error);
-          // Use sample data as fallback
-          setWords([
-            { id: '1', text: 'bươm bướm', dateAdded: new Date() },
-            { id: '2', text: 'vườn hoa', dateAdded: new Date() },
-            { id: '3', text: 'màu sắc', dateAdded: new Date() },
-          ]);
+          localStorage.setItem("words", JSON.stringify(loadedWords));
         }
+
       } catch (error) {
-        console.error('Error loading words:', error);
-        // Use sample data as fallback
-        setWords([
-          { id: '1', text: 'bươm bướm', dateAdded: new Date() },
-          { id: '2', text: 'vườn hoa', dateAdded: new Date() },
-          { id: '3', text: 'màu sắc', dateAdded: new Date() },
-        ]);
+        console.error(error);
       } finally {
         setIsLoadingWords(false);
       }
@@ -73,6 +76,8 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
     loadWords();
   }, []);
+
+
 
   // Filter words based on search and selected letter
   const filteredWords = words.filter(word => {
@@ -149,25 +154,17 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     if (!trimmedWord) return;
 
     try {
-      // Gọi API thêm từ
       const response = await api.library.addWord({
         text: trimmedWord
       });
 
-      if (response.error) {
-        toast.error('Lỗi khi thêm từ: ' + response.error);
-        return;
-      }
-
-      // Map đúng dữ liệu từ backend
       const newWord: Word = {
-        id: response.data?.wordid || Date.now(),        // dùng wordid từ backend
-        text: response.data?.word || trimmedWord,      // dùng word từ backend
-        dateAdded: new Date(response.data?.createdat || Date.now()) // createdat từ backend
+        id: response.data.id,
+        text: response.data.text,
+        dateAdded: new Date(response.data.dateAdded),
       };
 
-      // Thêm vào state và reset popup
-      setWords([newWord, ...words]);
+      setWords((prev) => [newWord, ...prev]);
       setIsAddWordPopupOpen(false);
       setNewWordInput('');
       toast.success(`Đã thêm từ "${newWord.text}" vào thư viện!`);
@@ -177,24 +174,26 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     }
   };
 
+
+
   const handleDeleteWord = async (wordId: string, wordText: string) => {
-  try {
-    const response = await api.library.deleteWord(wordId);
+    try {
+      const response = await api.library.deleteWord(wordId);
 
-    if (response.error) {
-      toast.error('Lỗi khi xóa từ: ' + response.error);
-      return;
+      if (response.error) {
+        toast.error('Lỗi khi xóa từ: ' + response.error);
+        return;
+      }
+
+      // FIX: dùng wordId, không phải wordid
+      setWords(words.filter((w) => w.id !== wordId));
+
+      toast.success(`Đã xóa từ "${wordText}" khỏi thư viện!`);
+    } catch (error) {
+      console.error('Error deleting word:', error);
+      toast.error('Không thể xóa từ. Vui lòng thử lại.');
     }
-
-    // FIX: dùng wordId, không phải wordid
-    setWords(words.filter((w) => w.id !== wordId));
-
-    toast.success(`Đã xóa từ "${wordText}" khỏi thư viện!`);
-  } catch (error) {
-    console.error('Error deleting word:', error);
-    toast.error('Không thể xóa từ. Vui lòng thử lại.');
-  }
-};
+  };
 
   const handleCancelAddWord = () => {
     setIsAddWordPopupOpen(false);

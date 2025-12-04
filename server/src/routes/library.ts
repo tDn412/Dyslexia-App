@@ -48,30 +48,43 @@ router.get('/words', async (req: Request, res: Response, next: NextFunction) => 
 });
 
 // ======================= POST /words =======================
-router.post('/words', async (req: Request, res: Response, next: NextFunction) => {
-  const userId = (req.body.userId as string) || (req.headers['x-user-id'] as string);
+router.post('/words', async (req: Request, res: Response) => {
+  const userId = (req.body.userId as string) || (req.headers['x-user-id'] as string) || 'u003';
   const { text } = req.body ?? {};
 
-  if (!userId) return res.status(400).json({ error: 'userId is required' });
   if (!text || !text.trim()) return res.status(400).json({ error: 'text is required' });
-  if (text.length > 15) return res.status(400).json({ error: 'text must be 15 characters or less' });
 
   try {
-    // Kiểm tra từ đã tồn tại chưa
-    const { data: existingWord, error: selectError } = await supabase
+    // 1. Kiểm tra từ đã tồn tại
+    const { data: existingWord } = await supabase
       .from('LibraryWord')
       .select('wordid')
       .eq('userid', userId)
       .eq('word', text.trim())
       .limit(1);
 
-    if (selectError) throw selectError;
     if (existingWord && existingWord.length > 0) return res.status(409).json({ error: 'word already exists' });
 
-    // Thêm từ mới
+    // 2. Lấy wordid lớn nhất hiện tại
+    const { data: lastWord } = await supabase
+      .from('LibraryWord')
+      .select('wordid')
+      .eq('userid', userId)
+      .order('wordid', { ascending: false })
+      .limit(1);
+
+    let newId = 'w001'; // mặc định nếu chưa có từ nào
+    if (lastWord && lastWord.length > 0) {
+      // lastWord[0].wordid = 'w005' -> tách số
+      const num = parseInt(lastWord[0].wordid.slice(1)) + 1;
+      newId = 'w' + num.toString().padStart(3, '0'); // vd: 'w006'
+    }
+
+    // 3. Thêm từ mới
     const { data: newWord, error: insertError } = await supabase
       .from('LibraryWord')
       .insert({
+        wordid: newId,
         word: text.trim(),
         userid: userId,
         createdat: new Date().toISOString(),
@@ -80,13 +93,11 @@ router.post('/words', async (req: Request, res: Response, next: NextFunction) =>
 
     if (insertError) throw insertError;
 
-    // Map dữ liệu trả về frontend
     res.status(201).json({
       id: newWord[0].wordid,
       text: newWord[0].word,
       dateAdded: newWord[0].createdat,
     });
-
   } catch (err) {
     console.error('Error adding word:', err);
     res.status(500).json({ error: 'Internal Server Error' });
