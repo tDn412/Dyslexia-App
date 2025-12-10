@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { supabase } from '../utils/supabaseClient.js';
 
 export const router = Router();
 
@@ -19,73 +20,90 @@ const speakings: SpeakingMaterial[] = [
   { id: '4', title: 'Một Ngày Ở Bãi Biển', topic: 'Thiên nhiên', level: 'A2' },
   { id: '5', title: 'Chú Chó Thân Thiện', topic: 'Động vật', level: 'B1' },
   { id: '6', title: 'Cuộc Phiêu Lưu Mùa Hè', topic: 'Truyện', level: 'B1' },
-  { id: '7', title: 'Giúp Đỡ Ở Nhà', topic: 'Gia đình', level: 'A1' },
-  { id: '8', title: 'Màu Sắc Xung Quanh', topic: 'Học tập', level: 'A1' },
-  { id: '9', title: 'Cây Thần Kỳ', topic: 'Truyện', level: 'B2' },
-  { id: '10', title: 'Hoa Quả Và Rau Củ', topic: 'Thức ăn', level: 'A1' },
-  { id: '11', title: 'Món Ăn Yêu Thích', topic: 'Thức ăn', level: 'A2' },
-  { id: '12', title: 'Chơi Ở Công Viên', topic: 'Phiêu lưu', level: 'B1' },
+  { id: '7', title: 'Công Nghệ Tương Lai', topic: 'Khoa học', level: 'B2' },
+  { id: '8', title: 'Bảo Vệ Môi Trường', topic: 'Xã hội', level: 'B2' },
 ];
 
 const speakingsMap = new Map<string, SpeakingMaterial>();
 speakings.forEach(s => speakingsMap.set(s.id, s));
 
-// GET /api/speakings - Get all speaking materials with filters
+// Get all speaking materials
 router.get('/', (req, res) => {
-  const level = req.query.level as string | undefined;
-  const topic = req.query.topic as string | undefined;
-  const search = (req.query.search as string) || '';
-  
-  let filtered = Array.from(speakingsMap.values());
-  
-  // Filter by level
+  const { level, topic } = req.query;
+  let results = speakings;
+
   if (level && level !== 'All') {
-    filtered = filtered.filter(s => s.level === level);
+    results = results.filter(s => s.level === level);
   }
-  
-  // Filter by topic
+
   if (topic) {
-    filtered = filtered.filter(s => s.topic === topic);
+    results = results.filter(s => s.topic === topic);
   }
-  
-  // Filter by search query
-  if (search) {
-    filtered = filtered.filter(s => 
-      s.title.toLowerCase().includes(search.toLowerCase()) ||
-      s.topic.toLowerCase().includes(search.toLowerCase())
-    );
-  }
-  
-  res.json(filtered);
+
+  res.json(results);
 });
 
-// GET /api/speakings/:id - Get speaking content by ID
+// Get speaking material by ID
 router.get('/:id', (req, res) => {
-  const speaking = speakingsMap.get(req.params.id);
-  if (!speaking) {
-    return res.status(404).json({ error: 'speaking material not found' });
+  const material = speakingsMap.get(req.params.id);
+  if (material) {
+    res.json(material);
+  } else {
+    res.status(404).json({ message: 'Speaking material not found' });
   }
-  res.json(speaking);
 });
 
-// POST /api/speakings/:id/record - Submit recording (stub)
-router.post('/:id/record', (req, res) => {
-  const { audioBlob, userId } = req.body ?? {};
-  const speaking = speakingsMap.get(req.params.id);
-  
-  if (!speaking) {
-    return res.status(404).json({ error: 'speaking material not found' });
+// Save speaking progress
+router.post('/progress', async (req, res) => {
+  const { userId, textId, accuracy, words } = req.body;
+
+  if (!userId || !textId) {
+    return res.status(400).json({ error: 'Missing userId or textId' });
   }
-  
-  // In a real app, this would process the audio and provide feedback
-  res.json({
-    success: true,
-    message: 'recording received',
-    feedback: {
-      accuracy: 0.85,
-      incorrectWords: [5, 8],
-      suggestions: [],
-    },
-  });
+
+  try {
+    // Check if progress exists
+    const { data: existingProgress } = await supabase
+      .from('speaking_progress')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('content_ref_id', textId)
+      .single();
+
+    if (existingProgress) {
+      // Update if better or newer
+      await supabase
+        .from('speaking_progress')
+        .update({
+          accuracy_score: accuracy,
+          words_correct: words, // Assuming words is a count or JSON
+          updated_at: new Date()
+        })
+        .eq('progress_id', existingProgress.progress_id);
+    } else {
+      await supabase
+        .from('speaking_progress')
+        .insert({
+          user_id: userId,
+          content_ref_id: textId,
+          accuracy_score: accuracy,
+          words_correct: words,
+          created_at: new Date()
+        });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving speaking progress:', error);
+    res.status(500).json({ error: 'Failed to save progress' });
+  }
 });
 
+// Analyze speaking (Mock for now, or connect to Python/Google Cloud)
+router.post('/analyze', async (req, res) => {
+  const { audioData, text } = req.body;
+  // TODO: Implement actual analysis
+  // For now, return a mock score
+  const mockScore = Math.floor(Math.random() * 20) + 80; // 80-100
+  res.json({ score: mockScore, feedback: 'Good pronunciation!' });
+});

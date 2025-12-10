@@ -1,122 +1,141 @@
-import { Sidebar } from "./Sidebar";
-import { ReadingCard } from "./ReadingCard";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabaseClient";
-
-type PageType =
-  | "Home"
-  | "Reading"
-  | "ReadingSelection"
-  | "Speaking"
-  | "SpeakingSelection"
-  | "Library"
-  | "SettingsOverview"
-  | "DisplaySettings"
-  | "AudioSettings"
-  | "OCRImport";
+import { Sidebar } from './Sidebar';
+import { ReadingCard } from './ReadingCard';
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { useTheme } from './ThemeContext';
 
 interface SpeakingSelectionPageProps {
-  onNavigate: React.Dispatch<React.SetStateAction<PageType>>;
-  onSelectSpeaking: (id: string) => void;
-  isSidebarCollapsed: boolean;
-  onToggleCollapse: () => void;
-  onSignOut: () => void;
+  onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
+  onSignOut?: () => void;
+  isSidebarCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function SpeakingSelectionPage({
-  onNavigate,
-  onSignOut,
-  isSidebarCollapsed = false,
-  onToggleCollapse,
-  onSelectSpeaking,
-}: SpeakingSelectionPageProps) {
+export function SpeakingSelectionPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse }: SpeakingSelectionPageProps) {
+  const { themeColors } = useTheme();
   const [selectedLevel, setSelectedLevel] = useState<string>('All');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [topicScrollIndex, setTopicScrollIndex] = useState(0);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [speakings, setSpeakings] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false); const [isLoadingNLP, setIsLoadingNLP] = useState(false);
-  const [processedSentences, setProcessedSentences] = useState<string[]>([]);
-  const [processedWords, setProcessedWords] = useState<string[][]>([]);
 
+  // Level filter options
+  const levels = ['All', 'A1', 'A2', 'B1', 'B2'];
 
-  // Level Filter Options
-  const levels = ["All", "A1", "A2", "B1", "B2"];
-
-  // Topic List
+  // Topic filter options with emojis
   const topics = [
-    { icon: "🐶", name: "Động vật" },
-    { icon: "🌳", name: "Thiên nhiên" },
-    { icon: "🍎", name: "Thức ăn" },
-    { icon: "👪", name: "Gia đình" },
-    { icon: "📚", name: "Truyện" },
-    { icon: "🎨", name: "Học tập" },
-    { icon: "🏖️", name: "Phiêu lưu" },
-    { icon: "⚽", name: "Thể thao" },
+    { icon: '🐶', name: 'Động vật' },
+    { icon: '🌳', name: 'Thiên nhiên' },
+    { icon: '🍎', name: 'Thức ăn' },
+    { icon: '👪', name: 'Gia đình' },
+    { icon: '📚', name: 'Truyện' },
+    { icon: '🎨', name: 'Học tập' },
+    { icon: '🏖️', name: 'Phiêu lưu' },
+    { icon: '⚽', name: 'Thể thao' },
   ];
 
-  // Horizontal scroll config
+  // Number of topics to show at once
   const topicsPerView = 4;
-  const maxScrollIndex =
-    Math.max(0, Math.ceil(topics.length / topicsPerView) - 1);
+  const maxScrollIndex = Math.max(0, Math.ceil(topics.length / topicsPerView) - 1);
 
+  // Get visible topics
   const visibleTopics = topics.slice(
     topicScrollIndex * topicsPerView,
     (topicScrollIndex + 1) * topicsPerView
   );
 
+  // Sample speaking materials
+  const readings = [
+    {
+      id: 1,
+      title: "Vườn Bướm",
+      topic: "Thiên nhiên",
+      level: "A1"
+    },
+    {
+      id: 2,
+      title: "Gia Đình Tôi",
+      topic: "Gia đình",
+      level: "A1"
+    },
+    {
+      id: 3,
+      title: "Động Vật Ở Sở Thú",
+      topic: "Động vật",
+      level: "A2"
+    },
+    {
+      id: 4,
+      title: "Một Ngày Ở Bãi Biển",
+      topic: "Thiên nhiên",
+      level: "A2"
+    },
+    {
+      id: 5,
+      title: "Chú Chó Thân Thiện",
+      topic: "Động vật",
+      level: "B1"
+    },
+    {
+      id: 6,
+      title: "Cuộc Phiêu Lưu Mùa Hè",
+      topic: "Truyện",
+      level: "B1"
+    },
+    {
+      id: 7,
+      title: "Giúp Đỡ Ở Nhà",
+      topic: "Gia đình",
+      level: "A1"
+    },
+    {
+      id: 8,
+      title: "Màu Sắc Xung Quanh",
+      topic: "Học tập",
+      level: "A1"
+    },
+    {
+      id: 9,
+      title: "Cây Thần Kỳ",
+      topic: "Truyện",
+      level: "B2"
+    },
+    {
+      id: 10,
+      title: "Hoa Quả Và Rau Củ",
+      topic: "Thức ăn",
+      level: "A1"
+    },
+    {
+      id: 11,
+      title: "Món Ăn Yêu Thích",
+      topic: "Thức ăn",
+      level: "A2"
+    },
+    {
+      id: 12,
+      title: "Chơi Ở Công Viên",
+      topic: "Phiêu lưu",
+      level: "B1"
+    },
+  ];
 
-  // Load speaking texts from Supabase
-  useEffect(() => {
-    async function fetchSpeakings() {
-      let query = supabase.from("Text").select("*");
-
-      // Level filter
-      if (selectedLevel !== "All") {
-        query = query.eq("level", selectedLevel);
-      }
-
-      // Topic filter
-      if (selectedTopic) {
-        query = query.eq("topic", selectedTopic);
-      }
-
-      // Search filter (title & topic)
-      if (search.trim() !== "") {
-        query = query.or(
-          `title.ilike.%${search}%,topic.ilike.%${search}%`
-        );
-      }
-
-      const { data, error } = await query;
-
-      if (error) console.error("Error fetching readings:", error);
-      else setSpeakings(data);
-    }
-
-    fetchSpeakings();
-  }, [selectedLevel, selectedTopic, search]);
-
-  // Apply all filters
-  const filteredSpeakings = speakings.filter((speaking) => {
-    const levelMatch = selectedLevel === 'All' || speaking.level === selectedLevel;
-    const topicMatch = !selectedTopic || speaking.topic === selectedTopic;
+  // Filter readings based on selected level and topic
+  const filteredReadings = readings.filter((reading) => {
+    const levelMatch = selectedLevel === 'All' || reading.level === selectedLevel;
+    const topicMatch = !selectedTopic || reading.topic === selectedTopic;
     return levelMatch && topicMatch;
   });
 
-  function handleOpenSpeaking(speaking: any) {
-    console.log("OPEN READING:", speaking);            // 👈 xem toàn bộ object
-    console.log("TEXT ID:", speaking.textid);          // 👈 xem textid
-    onSelectSpeaking(speaking.textid);
-  }
+  const handleReadingClick = () => {
+    if (onNavigate) {
+      onNavigate('Speaking');
+    }
+  };
 
   return (
-    <div className="flex h-screen bg-[#FFF8E7]">
+    <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
       {/* Sidebar */}
-      <Sidebar
-        activePage="Nói"
+      <Sidebar 
+        activePage="Nói" 
         onNavigate={onNavigate}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
@@ -129,20 +148,18 @@ export function SpeakingSelectionPage({
           {/* Search Bar */}
           <div className="mb-8">
             <div className="relative">
-              <Search
-                className="absolute left-6 top-1/2 transform -translate-y-1/2 w-7 h-7 text-[#666666] cursor-pointer"
-                onClick={() => setSearch(searchInput)}     // 🔥 bấm vào mới search
-              />
+              <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 w-7 h-7" style={{ color: themeColors.textMuted }} />
               <input
                 type="text"
                 placeholder="Tìm kiếm bài nói..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full bg-[#FFFCF2] border-2 border-[#E0DCCC] rounded-3xl pl-16 pr-6 py-5 text-[#111] placeholder:text-[#999] focus:outline-none focus:border-[#D4C5A9] shadow-md"
+                className="w-full rounded-3xl pl-16 pr-6 py-5 placeholder:text-[#999999] focus:outline-none focus:ring-0 shadow-md transition-all border-2"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                  fontSize: "24px",
-                  letterSpacing: "0.12em",
+                  fontSize: '24px',
+                  letterSpacing: '0.12em',
+                  backgroundColor: themeColors.cardBackground,
+                  borderColor: themeColors.border,
+                  color: themeColors.textMain,
                 }}
               />
             </div>
@@ -155,14 +172,14 @@ export function SpeakingSelectionPage({
                 <button
                   key={level}
                   onClick={() => setSelectedLevel(level)}
-                  className={`px-8 py-3 rounded-2xl border-2 transition-all shadow-sm ${selectedLevel === level
-                    ? "bg-[#D4E7F5] border-[#B8D4E8]"
-                    : "bg-[#FFFCF2] border-[#E0DCCC] hover:bg-[#FFF4E0]"
-                    }`}
+                  className="px-8 py-3 rounded-2xl border-2 transition-all shadow-sm"
                   style={{
                     fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                    fontSize: "24px",
-                    letterSpacing: "0.12em",
+                    fontSize: '24px',
+                    letterSpacing: '0.12em',
+                    backgroundColor: selectedLevel === level ? themeColors.accentMain : themeColors.cardBackground,
+                    borderColor: selectedLevel === level ? themeColors.accentHover : themeColors.border,
+                    color: themeColors.textMain,
                   }}
                 >
                   {level}
@@ -171,47 +188,50 @@ export function SpeakingSelectionPage({
             </div>
           </div>
 
-          {/* Topic Filter */}
+          {/* Topic Filter with Horizontal Scroll */}
           <div className="mb-12">
-            <div
-              className="text-[#111] mb-4"
+            <div 
+              className="mb-4"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: "26px",
-                letterSpacing: "0.12em",
+                fontSize: '26px',
+                letterSpacing: '0.12em',
+                color: themeColors.textMain,
               }}
             >
               Chủ đề:
             </div>
-
             <div className="flex items-center gap-4">
+              {/* Left Arrow Button */}
               {topicScrollIndex > 0 && (
                 <button
                   onClick={() => setTopicScrollIndex(topicScrollIndex - 1)}
-                  className="w-12 h-12 rounded-full bg-[#D4E7F5] border-2 border-[#B8D4E8] flex items-center justify-center shadow-md"
+                  className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-md border-2"
+                  style={{
+                    backgroundColor: themeColors.accentMain,
+                    borderColor: themeColors.accentHover,
+                  }}
+                  aria-label="Previous topics"
                 >
-                  <ChevronLeft className="w-6 h-6 text-[#111]" />
+                  <ChevronLeft className="w-6 h-6" style={{ color: themeColors.textMain }} />
                 </button>
               )}
 
+              {/* Topic Chips Container */}
               <div className="flex-1 overflow-hidden">
-                <div className="flex gap-4 transition-all">
+                <div className="flex gap-4 transition-all duration-500 ease-in-out">
                   {visibleTopics.map((topic) => (
                     <button
                       key={topic.name}
-                      onClick={() =>
-                        setSelectedTopic(
-                          selectedTopic === topic.name ? null : topic.name
-                        )
-                      }
-                      className={`flex-shrink-0 px-6 py-3 rounded-2xl border-2 transition-all shadow-sm ${selectedTopic === topic.name
-                        ? "bg-[#FFE8CC] border-[#E8DCC8]"
-                        : "bg-[#FFFCF2] border-[#E0DCCC] hover:bg-[#FFF4E0]"
-                        }`}
+                      onClick={() => setSelectedTopic(selectedTopic === topic.name ? null : topic.name)}
+                      className="flex-shrink-0 px-6 py-3 rounded-2xl border-2 transition-all shadow-sm"
                       style={{
                         fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                        fontSize: "24px",
-                        letterSpacing: "0.12em",
+                        fontSize: '24px',
+                        letterSpacing: '0.12em',
+                        backgroundColor: selectedTopic === topic.name ? themeColors.accentMain : themeColors.cardBackground,
+                        borderColor: selectedTopic === topic.name ? themeColors.accentHover : themeColors.border,
+                        color: themeColors.textMain,
                       }}
                     >
                       <span className="mr-2">{topic.icon}</span>
@@ -221,40 +241,47 @@ export function SpeakingSelectionPage({
                 </div>
               </div>
 
+              {/* Right Arrow Button */}
               {topicScrollIndex < maxScrollIndex && (
                 <button
                   onClick={() => setTopicScrollIndex(topicScrollIndex + 1)}
-                  className="w-12 h-12 rounded-full bg-[#D4E7F5] border-2 border-[#B8D4E8] flex items-center justify-center shadow-md"
+                  className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-md border-2"
+                  style={{
+                    backgroundColor: themeColors.accentMain,
+                    borderColor: themeColors.accentHover,
+                  }}
+                  aria-label="Next topics"
                 >
-                  <ChevronRight className="w-6 h-6 text-[#111]" />
+                  <ChevronRight className="w-6 h-6" style={{ color: themeColors.textMain }} />
                 </button>
               )}
             </div>
           </div>
 
-          {/* Speaking Cards Grid - 2 columns */}
+          {/* Reading Cards Grid - 2 columns */}
           <div className="grid grid-cols-2 gap-8">
-            {filteredSpeakings.map((speaking) => (
+            {filteredReadings.map((reading) => (
               <ReadingCard
-                key={speaking.textid}
-                title={speaking.title}
-                topic={speaking.topic}
-                level={`Cấp ${speaking.level}`}
-                onClick={() => handleOpenSpeaking(speaking)}   // 🔥 Dùng hàm đúng!
+                key={reading.id}
+                title={reading.title}
+                topic={reading.topic}
+                level={`Cấp ${reading.level}`}
+                onClick={handleReadingClick}
               />
             ))}
           </div>
 
-          {filteredSpeakings.length === 0 && !isLoading && (
-            <div
-              className="text-center text-[#666] py-12"
+          {/* No results message */}
+          {filteredReadings.length === 0 && (
+            <div 
+              className="text-center text-[#666666] py-12"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: "24px",
-                letterSpacing: "0.12em",
+                fontSize: '24px',
+                letterSpacing: '0.12em',
               }}
             >
-              Không tìm thấy bài nói. Hãy thử chỉnh bộ lọc.
+              No readings found. Try adjusting your filters.
             </div>
           )}
         </div>

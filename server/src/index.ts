@@ -11,6 +11,7 @@ import { router as dashboardRouter } from './routes/dashboard.js';
 import { router as readingsRouter } from './routes/readings.js';
 import { router as speakingsRouter } from './routes/speakings.js';
 import { router as ocrRouter } from './routes/ocr.js';
+import { router as quizzesRouter } from './routes/quizzes.js';
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/readings', readingsRouter);
 app.use('/api/speakings', speakingsRouter);
 app.use('/api/ocr', ocrRouter);
+app.use('/api/quizzes', quizzesRouter);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

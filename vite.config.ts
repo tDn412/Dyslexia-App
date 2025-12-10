@@ -5,8 +5,6 @@
 
   export default defineConfig({
     plugins: [react()],
-    root: './src', 
-    
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {

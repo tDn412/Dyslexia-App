@@ -1,46 +1,25 @@
 import { Sidebar } from './Sidebar';
+import { BookOpen, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useTheme } from './ThemeContext';
 import { ReadingCard } from './ReadingCard';
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
-import { useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
-
-
-type PageType =
-  | "Home"
-  | "Reading"
-  | "ReadingSelection"
-  | "Speaking"
-  | "SpeakingSelection"
-  | "Library"
-  | "SettingsOverview"
-  | "DisplaySettings"
-  | "AudioSettings"
-  | "OCRImport";
+import { fetchReadings } from '../utils/api';
 
 interface ReadingSelectionPageProps {
-  onNavigate: React.Dispatch<React.SetStateAction<PageType>>;  // 🔥 SỬA DÒNG NÀY
-  onSelectReading: (id: string) => void;
-  isSidebarCollapsed: boolean;
-  onToggleCollapse: () => void;
-  onSignOut: () => void;
+  onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
+  onSignOut?: () => void;
+  isSidebarCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-
-export default function ReadingSelectionPage({
-  onNavigate,
-  onSelectReading,
-  isSidebarCollapsed,
-  onToggleCollapse,
-  onSignOut,
-}: ReadingSelectionPageProps) {
+export function ReadingSelectionPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse }: ReadingSelectionPageProps) {
+  const { themeColors } = useTheme();
   const [selectedLevel, setSelectedLevel] = useState<string>('All');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [topicScrollIndex, setTopicScrollIndex] = useState(0);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-
-
+  const [readings, setReadings] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
 
   // Level filter options
   const levels = ['All', 'A1', 'A2', 'B1', 'B2'];
@@ -67,60 +46,31 @@ export default function ReadingSelectionPage({
     (topicScrollIndex + 1) * topicsPerView
   );
 
-  const [readings, setReadings] = useState<any[]>([]);
-
-
-  // Sample reading materials
   useEffect(() => {
-    async function fetchReadings() {
-      let query = supabase.from("Text").select("*");
-
-      // Level filter
-      if (selectedLevel !== "All") {
-        query = query.eq("level", selectedLevel);
+    const loadReadings = async () => {
+      setLoading(true);
+      try {
+        const data = await fetchReadings(selectedLevel, selectedTopic || undefined, searchQuery);
+        setReadings(data);
+      } catch (error) {
+        console.error("Failed to load readings", error);
+      } finally {
+        setLoading(false);
       }
+    };
+    loadReadings();
+  }, [selectedLevel, selectedTopic, searchQuery]);
 
-      // Topic filter
-      if (selectedTopic) {
-        query = query.eq("topic", selectedTopic);
-      }
-
-      // Search filter (title & topic)
-      if (search.trim() !== "") {
-        query = query.or(
-          `title.ilike.%${search}%,topic.ilike.%${search}%`
-        );
-      }
-
-      const { data, error } = await query;
-
-      if (error) console.error("Error fetching readings:", error);
-      else setReadings(data);
+  const handleReadingClick = (id: string) => {
+    // Store selected reading ID in localStorage or context to pass to ReadingPage
+    localStorage.setItem('currentReadingId', id);
+    if (onNavigate) {
+      onNavigate('Reading');
     }
-
-    fetchReadings();
-  }, [selectedLevel, selectedTopic, search]);
-
-
-
-  // Filter readings based on selected level and topic
-  const filteredReadings = readings.filter((reading) => {
-    const levelMatch = selectedLevel === 'All' || reading.level === selectedLevel;
-    const topicMatch = !selectedTopic || reading.topic === selectedTopic;
-    return levelMatch && topicMatch;
-  });
-
-
-  function handleOpenReading(reading: any) {
-    console.log("OPEN READING:", reading);            // 👈 xem toàn bộ object
-    console.log("TEXT ID:", reading.textid);          // 👈 xem textid
-    onSelectReading(reading.textid);
-    onNavigate("Reading");
-  }
-
+  };
 
   return (
-    <div className="flex h-screen bg-[#FFF8E7]">
+    <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
       {/* Sidebar */}
       <Sidebar
         activePage="Đọc"
@@ -136,25 +86,24 @@ export default function ReadingSelectionPage({
           {/* Search Bar */}
           <div className="mb-8">
             <div className="relative">
-              <Search
-                className="absolute left-6 top-1/2 transform -translate-y-1/2 w-7 h-7 text-[#666666] cursor-pointer"
-                onClick={() => setSearch(searchInput)}     // 🔥 bấm vào mới search
-              />
+              <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 w-7 h-7" style={{ color: themeColors.textMuted }} />
               <input
                 type="text"
                 placeholder="Tìm kiếm bài đọc..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full bg-[#FFFCF2] border-2 border-[#E0DCCC] rounded-3xl pl-16 pr-6 py-5 text-[#111111] placeholder:text-[#999999] focus:outline-none focus:border-[#D4C5A9] focus:ring-0 shadow-md transition-all"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-3xl pl-16 pr-6 py-5 placeholder:text-[#999999] focus:outline-none focus:ring-0 shadow-md transition-all border-2"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                   fontSize: '24px',
                   letterSpacing: '0.12em',
+                  backgroundColor: themeColors.cardBackground,
+                  borderColor: themeColors.border,
+                  color: themeColors.textMain,
                 }}
               />
             </div>
           </div>
-
 
           {/* Level Filter */}
           <div className="mb-8">
@@ -163,14 +112,14 @@ export default function ReadingSelectionPage({
                 <button
                   key={level}
                   onClick={() => setSelectedLevel(level)}
-                  className={`px-8 py-3 rounded-2xl border-2 transition-all shadow-sm ${selectedLevel === level
-                    ? 'bg-[#D4E7F5] border-[#B8D4E8] text-[#111111]'
-                    : 'bg-[#FFFCF2] border-[#E0DCCC] text-[#111111] hover:bg-[#FFF4E0]'
-                    }`}
+                  className="px-8 py-3 rounded-2xl border-2 transition-all shadow-sm"
                   style={{
                     fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                     fontSize: '24px',
                     letterSpacing: '0.12em',
+                    backgroundColor: selectedLevel === level ? themeColors.accentMain : themeColors.cardBackground,
+                    borderColor: selectedLevel === level ? themeColors.accentHover : themeColors.border,
+                    color: themeColors.textMain,
                   }}
                 >
                   {level}
@@ -182,11 +131,12 @@ export default function ReadingSelectionPage({
           {/* Topic Filter with Horizontal Scroll */}
           <div className="mb-12">
             <div
-              className="text-[#111111] mb-4"
+              className="mb-4"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                 fontSize: '26px',
                 letterSpacing: '0.12em',
+                color: themeColors.textMain,
               }}
             >
               Chủ đề:
@@ -196,10 +146,14 @@ export default function ReadingSelectionPage({
               {topicScrollIndex > 0 && (
                 <button
                   onClick={() => setTopicScrollIndex(topicScrollIndex - 1)}
-                  className="flex-shrink-0 w-12 h-12 rounded-full bg-[#D4E7F5] border-2 border-[#B8D4E8] flex items-center justify-center hover:bg-[#C5DCF0] transition-all shadow-md"
+                  className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-md border-2"
+                  style={{
+                    backgroundColor: themeColors.accentMain,
+                    borderColor: themeColors.accentHover,
+                  }}
                   aria-label="Previous topics"
                 >
-                  <ChevronLeft className="w-6 h-6 text-[#111111]" />
+                  <ChevronLeft className="w-6 h-6" style={{ color: themeColors.textMain }} />
                 </button>
               )}
 
@@ -210,14 +164,14 @@ export default function ReadingSelectionPage({
                     <button
                       key={topic.name}
                       onClick={() => setSelectedTopic(selectedTopic === topic.name ? null : topic.name)}
-                      className={`flex-shrink-0 px-6 py-3 rounded-2xl border-2 transition-all shadow-sm ${selectedTopic === topic.name
-                        ? 'bg-[#FFE8CC] border-[#E8DCC8] text-[#111111]'
-                        : 'bg-[#FFFCF2] border-[#E0DCCC] text-[#111111] hover:bg-[#FFF4E0]'
-                        }`}
+                      className="flex-shrink-0 px-6 py-3 rounded-2xl border-2 transition-all shadow-sm"
                       style={{
                         fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                         fontSize: '24px',
                         letterSpacing: '0.12em',
+                        backgroundColor: selectedTopic === topic.name ? themeColors.accentMain : themeColors.cardBackground,
+                        borderColor: selectedTopic === topic.name ? themeColors.accentHover : themeColors.border,
+                        color: themeColors.textMain,
                       }}
                     >
                       <span className="mr-2">{topic.icon}</span>
@@ -231,30 +185,38 @@ export default function ReadingSelectionPage({
               {topicScrollIndex < maxScrollIndex && (
                 <button
                   onClick={() => setTopicScrollIndex(topicScrollIndex + 1)}
-                  className="flex-shrink-0 w-12 h-12 rounded-full bg-[#D4E7F5] border-2 border-[#B8D4E8] flex items-center justify-center hover:bg-[#C5DCF0] transition-all shadow-md"
+                  className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-md border-2"
+                  style={{
+                    backgroundColor: themeColors.accentMain,
+                    borderColor: themeColors.accentHover,
+                  }}
                   aria-label="Next topics"
                 >
-                  <ChevronRight className="w-6 h-6 text-[#111111]" />
+                  <ChevronRight className="w-6 h-6" style={{ color: themeColors.textMain }} />
                 </button>
               )}
             </div>
           </div>
 
           {/* Reading Cards Grid - 2 columns */}
-          <div className="grid grid-cols-2 gap-8">
-            {filteredReadings.map((reading) => (
-              <ReadingCard
-                key={reading.textid}
-                title={reading.title}
-                topic={reading.topic}
-                level={`Cấp ${reading.level}`}
-                onClick={() => handleOpenReading(reading)}   // 🔥 Dùng hàm đúng!
-              />
-            ))}
-          </div>
+          {loading ? (
+            <div className="text-center py-12">Loading...</div>
+          ) : (
+            <div className="grid grid-cols-2 gap-8">
+              {readings.map((reading) => (
+                <ReadingCard
+                  key={reading.textid || reading.id}
+                  title={reading.title}
+                  topic={reading.topic}
+                  level={`Cấp ${reading.level}`}
+                  onClick={() => handleReadingClick(reading.textid || reading.id)}
+                />
+              ))}
+            </div>
+          )}
 
           {/* No results message */}
-          {filteredReadings.length === 0 && (
+          {!loading && readings.length === 0 && (
             <div
               className="text-center text-[#666666] py-12"
               style={{

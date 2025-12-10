@@ -1,26 +1,25 @@
-// src/utils/supabaseClient.ts
-
 import { createClient } from '@supabase/supabase-js';
-// 'dotenv/config' đã được gọi trong index.ts, nhưng bạn có thể thêm lại để đảm bảo
-// import 'dotenv/config'; 
+import 'dotenv/config';
 
-// Lấy thông tin từ biến môi trường
 const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY; // Nếu dùng cho backend
 
-// Kiểm tra biến môi trường (TypeScript khuyên dùng)
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Thiếu SUPABASE_URL hoặc SUPABASE_SERVICE_KEY trong .env');
+if (!supabaseUrl || (!supabaseKey && !supabaseAnonKey)) {
+  throw new Error('Missing Supabase URL or Keys');
 }
 
-// Khởi tạo Supabase Client
-// Sử dụng Service Role Key (secret) cho môi trường backend để có quyền truy cập đầy đủ
-export const supabase = createClient(supabaseUrl!, supabaseServiceKey!, {
-    // Tùy chọn: thiết lập cache hoặc schema
-    auth: {
-        persistSession: false, // Vì đây là server backend, không cần duy trì session
-    }
+// Fallback to Anon Key if Service Key is missing (for development)
+const keyToUse = supabaseKey || supabaseAnonKey;
+
+if (!supabaseKey) {
+  console.warn("⚠️ WARNING: SUPABASE_SERVICE_KEY is missing. Using SUPABASE_ANON_KEY as fallback. Some RLS policies might block writes.");
+}
+
+export const supabase = createClient(supabaseUrl, keyToUse!, {
+  auth: {
+    persistSession: false, // Vì đây là server backend, không cần duy trì session
+  }
 });
 
 // Bạn có thể export thêm client dùng Anon Key nếu cần

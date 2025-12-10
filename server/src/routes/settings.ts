@@ -1,95 +1,54 @@
 import { Router } from 'express';
+import { supabase } from '../utils/supabaseClient.js';
 
 export const router = Router();
 
-type AudioSettings = {
-  speechRate: number;
-  pitch: number;
-  volume: number;
-  voice: string | null;
-};
+// GET /api/settings - Get user settings
+router.get('/', async (req, res) => {
+  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+  if (!userId) return res.status(400).json({ error: 'userId is required' });
 
-type DisplaySettings = {
-  fontSize: number;
-  fontFamily: string;
-  letterSpacing: number;
-  lineSpacing: number;
-  theme: 'light' | 'dark' | 'system' | number;
-};
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
 
-type Settings = {
-  audio: AudioSettings;
-  display: DisplaySettings;
-};
+  if (error && error.code !== 'PGRST116') { // PGRST116 is "The result contains 0 rows"
+    return res.status(500).json(error);
+  }
 
-const defaultSettings: Settings = {
-  audio: { 
-    speechRate: 1.0, 
-    pitch: 1.0, 
-    volume: 1.0, 
-    voice: 'male-1' 
-  },
-  display: { 
-    fontSize: 26, 
-    fontFamily: "'OpenDyslexic', 'Lexend', sans-serif", 
-    letterSpacing: 0.14, 
-    lineSpacing: 1.8, 
-    theme: 0 
-  },
-};
+  if (!data) {
+    // Return default settings if no profile found
+    return res.json({
+      font_family: 'Open Sans',
+      font_size: 16,
+      letter_spacing: 1.0,
+      color_theme: 'light',
+      reading_voice: 'vi-VN-Standard-A',
+      reading_speed: 1.0
+    });
+  }
 
-const userSettings = new Map<string, Settings>();
-
-router.get('/', (req, res) => {
-  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'demo';
-  res.json(userSettings.get(userId) ?? defaultSettings);
+  res.json(data);
 });
 
-router.get('/audio', (req, res) => {
-  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'demo';
-  const settings = userSettings.get(userId) ?? defaultSettings;
-  res.json(settings.audio);
+// PUT /api/settings - Update settings
+router.post('/', async (req, res) => {
+  const { userId, settings } = req.body;
+  if (!userId || !settings) return res.status(400).json({ error: 'userId and settings are required' });
+
+  // Upsert user settings
+  const { data, error } = await supabase
+    .from('user_settings')
+    .upsert({
+      user_id: userId,
+      ...settings,
+      updated_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  if (error) return res.status(500).json(error);
+  res.json(data);
 });
-
-router.get('/display', (req, res) => {
-  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'demo';
-  const settings = userSettings.get(userId) ?? defaultSettings;
-  res.json(settings.display);
-});
-
-router.put('/', (req, res) => {
-  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'demo';
-  const incoming = req.body as Partial<Settings>;
-  const current = userSettings.get(userId) ?? defaultSettings;
-  const merged: Settings = {
-    audio: { ...current.audio, ...(incoming.audio ?? {}) },
-    display: { ...current.display, ...(incoming.display ?? {}) },
-  };
-  userSettings.set(userId, merged);
-  res.json(merged);
-});
-
-router.put('/audio', (req, res) => {
-  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'demo';
-  const current = userSettings.get(userId) ?? defaultSettings;
-  const updated: Settings = {
-    ...current,
-    audio: { ...current.audio, ...(req.body as Partial<AudioSettings>) },
-  };
-  userSettings.set(userId, updated);
-  res.json(updated.audio);
-});
-
-router.put('/display', (req, res) => {
-  const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'demo';
-  const current = userSettings.get(userId) ?? defaultSettings;
-  const updated: Settings = {
-    ...current,
-    display: { ...current.display, ...(req.body as Partial<DisplaySettings>) },
-  };
-  userSettings.set(userId, updated);
-  res.json(updated.display);
-});
-
-
-

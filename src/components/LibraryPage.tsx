@@ -2,32 +2,34 @@ import { Sidebar } from './Sidebar';
 import { useState, useRef, useEffect } from 'react';
 import svgPaths from '../imports/svg-5gav2b48w6';
 import { Check, X } from 'lucide-react';
-import { speakText } from '../utils/textToSpeech';
+import { useTheme } from './ThemeContext';
+import { fetchLibrary, addToLibrary } from '../utils/api';
 import { toast } from 'sonner';
-import { api } from '../utils/api';
 
 interface LibraryPageProps {
-  onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
+  onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport' | 'Exercise') => void;
   onSignOut?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  userId?: string;
 }
 
 interface Word {
-  id: string;
+  id: number;
   text: string;
   dateAdded: Date;
 }
 
-export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse }: LibraryPageProps) {
+export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, userId = 'demo-user-id' }: LibraryPageProps) {
+  const { themeColors } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const alphabetContainerRef = useRef<HTMLDivElement>(null);
   const [isAddWordPopupOpen, setIsAddWordPopupOpen] = useState(false);
   const [newWordInput, setNewWordInput] = useState('');
   const popupRef = useRef<HTMLDivElement>(null);
-  const [words, setWords] = useState<Word[]>([]);
-  const [isLoadingWords, setIsLoadingWords] = useState(true);
+  const [allWords, setAllWords] = useState<Word[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Vietnamese alphabet for the filter
   const alphabet = [
@@ -36,61 +38,37 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     'U', 'Ư', 'V', 'X', 'Y'
   ];
 
-  // Load words from backend on mount
+  // Sample word data removed in favor of API call
+
   useEffect(() => {
-    const loadWords = async () => {
-      setIsLoadingWords(true);
-
-      // thử load từ localStorage trước
-      const cached = localStorage.getItem('words');
-      if (cached) {
-        setWords(JSON.parse(cached).map((w: any) => ({
-          ...w,
-          dateAdded: new Date(w.dateAdded)
-        })));
-        setIsLoadingWords(false);
-        return;
-      }
-
+    const loadLibrary = async () => {
+      setLoading(true);
       try {
-        const response = await api.library.getWords();
-        console.log("RAW RESPONSE:", response);
-
-        if (response.data && response.data.length > 0) {
-          const loadedWords = response.data.map((w: any) => ({
-            id: w.id,
-            text: w.text,
-            dateAdded: new Date(w.dateAdded)
-          }));
-
-          setWords(loadedWords);
-          localStorage.setItem("words", JSON.stringify(loadedWords));
-        }
-
+        // userId is now from props
+        const data = await fetchLibrary(userId);
+        // Map API data to Word interface
+        const mappedWords = data.map((item: any) => ({
+          id: item.id,
+          text: item.word,
+          dateAdded: new Date(item.created_at)
+        }));
+        setAllWords(mappedWords);
       } catch (error) {
-        console.error(error);
+        console.error("Failed to load library", error);
+        toast.error("Lỗi khi tải thư viện từ.");
       } finally {
-        setIsLoadingWords(false);
+        setLoading(false);
       }
     };
-
-    loadWords();
+    loadLibrary();
   }, []);
 
-
-
   // Filter words based on search and selected letter
-  const filteredWords = words.filter(word => {
-    const text = (word?.text || "").toLowerCase();
-
-    const matchesSearch = text.includes(searchQuery.toLowerCase());
-    const matchesLetter =
-      !selectedLetter ||
-      text.charAt(0).toUpperCase() === selectedLetter;
-
+  const filteredWords = allWords.filter(word => {
+    const matchesSearch = word.text.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesLetter = !selectedLetter || word.text.charAt(0).toUpperCase() === selectedLetter;
     return matchesSearch && matchesLetter;
   });
-
 
   // Group words by date
   const groupWordsByDate = (words: Word[]) => {
@@ -126,21 +104,24 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
   const groupedWords = groupWordsByDate(filteredWords);
 
-  const handlePlayPronunciation = async (wordText?: string) => {
-    if (!wordText?.trim()) {
-      toast.error('Không có từ để phát âm.');
-      return;
-    }
+  const handlePlayPronunciation = (word: string) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(word);
+      utterance.lang = 'vi-VN';
 
-    try {
-      await speakText({
-        text: wordText,
-        lang: 'vi-VN',
-        rate: 1.0,
-      });
-    } catch (error) {
-      console.error('Error playing pronunciation:', error);
-      toast.error('Không thể phát âm. Vui lòng thử lại.');
+      // Try to find a Vietnamese voice
+      const voices = window.speechSynthesis.getVoices();
+      const vietnameseVoice = voices.find(voice =>
+        voice.lang.includes('vi') || voice.lang.includes('VN')
+      );
+
+      if (vietnameseVoice) {
+        utterance.voice = vietnameseVoice;
+      }
+
+      window.speechSynthesis.speak(utterance);
+    } else {
+      toast.error("Trình duyệt không hỗ trợ đọc văn bản.");
     }
   };
 
@@ -150,48 +131,27 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   };
 
   const handleConfirmAddWord = async () => {
-    const trimmedWord = newWordInput.trim();
-    if (!trimmedWord) return;
+    if (newWordInput.trim()) {
+      try {
+        // userId is now from props
+        await addToLibrary(userId, newWordInput.trim());
+        toast.success("Đã thêm từ mới thành công!");
 
-    try {
-      const response = await api.library.addWord({
-        text: trimmedWord
-      });
+        // Refresh library
+        const data = await fetchLibrary(userId);
+        const mappedWords = data.map((item: any) => ({
+          id: item.id,
+          text: item.word,
+          dateAdded: new Date(item.created_at)
+        }));
+        setAllWords(mappedWords);
 
-      const newWord: Word = {
-        id: response.data.id,
-        text: response.data.text,
-        dateAdded: new Date(response.data.dateAdded),
-      };
-
-      setWords((prev) => [newWord, ...prev]);
-      setIsAddWordPopupOpen(false);
-      setNewWordInput('');
-      toast.success(`Đã thêm từ "${newWord.text}" vào thư viện!`);
-    } catch (error) {
-      console.error('Error adding word:', error);
-      toast.error('Không thể thêm từ. Vui lòng thử lại.');
-    }
-  };
-
-
-
-  const handleDeleteWord = async (wordId: string, wordText: string) => {
-    try {
-      const response = await api.library.deleteWord(wordId);
-
-      if (response.error) {
-        toast.error('Lỗi khi xóa từ: ' + response.error);
-        return;
+        setIsAddWordPopupOpen(false);
+        setNewWordInput('');
+      } catch (error) {
+        console.error("Failed to add word", error);
+        toast.error("Lỗi khi thêm từ mới.");
       }
-
-      // FIX: dùng wordId, không phải wordid
-      setWords(words.filter((w) => w.id !== wordId));
-
-      toast.success(`Đã xóa từ "${wordText}" khỏi thư viện!`);
-    } catch (error) {
-      console.error('Error deleting word:', error);
-      toast.error('Không thể xóa từ. Vui lòng thử lại.');
     }
   };
 
@@ -226,7 +186,7 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   }, [isAddWordPopupOpen]);
 
   return (
-    <div className="flex h-screen bg-[#fff8e7]">
+    <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
       {/* Sidebar */}
       <Sidebar
         activePage="Thư viện"
@@ -241,22 +201,30 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         <div className="box-border flex flex-col items-start pb-[100px] pl-[54px] pr-[140px] pt-[54px]">
           {/* Search Bar */}
           <div className="h-[82px] relative w-full mb-[48px]">
-            <div className="bg-[#FFFCF2] h-[82px] rounded-[27px] relative w-full">
+            <div
+              className="h-[82px] rounded-[27px] relative w-full"
+              style={{ backgroundColor: themeColors.cardBackground }}
+            >
               <div className="box-border flex h-[82px] items-center overflow-clip pl-[72px] pr-[27px] py-[22.5px] relative w-full">
                 <input
                   type="text"
-                  placeholder="Tìm từ trong thư viện..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent border-none outline-none text-[#111111] placeholder:text-[#999999]"
+                  placeholder="Tìm kiếm từ..."
+                  className="flex-1 bg-transparent outline-none"
                   style={{
                     fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                    fontSize: '24px',
-                    letterSpacing: '0.12em',
+                    fontSize: '26px',
+                    letterSpacing: '0.14em',
+                    color: themeColors.textMain,
                   }}
                 />
               </div>
-              <div aria-hidden="true" className="absolute border-2 border-[#e0dccc] border-solid inset-0 pointer-events-none rounded-[27px] shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.1),0px_2px_4px_-2px_rgba(0,0,0,0.1)]" />
+              <div
+                aria-hidden="true"
+                className="absolute border-2 border-solid inset-0 pointer-events-none rounded-[27px] shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.1),0px_2px_4px_-2px_rgba(0,0,0,0.1)]"
+                style={{ borderColor: themeColors.border }}
+              />
             </div>
 
             {/* Search Icon */}
@@ -272,28 +240,31 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
           {/* Word Groups */}
           <div className="flex flex-col gap-[48px] w-full">
-            {Object.entries(groupedWords).length === 0 ? (
+            {loading ? (
+              <div className="text-center py-12">Loading...</div>
+            ) : Object.entries(groupedWords).length === 0 ? (
               <div
-                className="text-center text-[#666666] py-12"
+                className="text-center py-12"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                  fontSize: '24px',
-                  letterSpacing: '0.12em',
+                  fontSize: '20px',
+                  letterSpacing: '0.02em',
+                  color: themeColors.textMuted,
                 }}
               >
-                Không tìm thấy từ nào. Thử tìm kiếm khác hoặc thêm từ mới.
+                Không có từ vựng trong danh mục này
               </div>
             ) : (
               Object.entries(groupedWords).map(([dateGroup, words]) => (
                 <div key={dateGroup} className="flex flex-col gap-[32px]">
                   {/* Date Header */}
                   <h2
-                    className="text-[#111111]"
                     style={{
                       fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                       fontSize: '32px',
                       letterSpacing: '0.12em',
                       lineHeight: '1.4',
+                      color: themeColors.textMain,
                     }}
                   >
                     {dateGroup}
@@ -304,22 +275,28 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
                     className={`grid gap-6 w-full ${isSidebarCollapsed ? 'grid-cols-4' : 'grid-cols-3'
                       }`}
                   >
-                    {words.map((word) => (
+                    {words.map((word, index) => (
                       <div
-                        key={word.id}
-                        className="bg-[#fffcf2] h-[220px] relative rounded-[18px] cursor-pointer hover:shadow-lg transition-shadow"
+                        key={`${word.id}-${index}`}
+                        className="h-[220px] relative rounded-[18px] cursor-pointer hover:shadow-lg transition-shadow"
+                        style={{ backgroundColor: themeColors.cardBackground }}
                       >
-                        <div aria-hidden="true" className="absolute border-2 border-[#e0dccc] border-solid inset-0 pointer-events-none rounded-[18px] shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.1),0px_2px_4px_-2px_rgba(0,0,0,0.1)]" />
+                        <div
+                          aria-hidden="true"
+                          className="absolute border-2 border-solid inset-0 pointer-events-none rounded-[18px] shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.1),0px_2px_4px_-2px_rgba(0,0,0,0.1)]"
+                          style={{ borderColor: themeColors.border }}
+                        />
 
                         {/* Word Text */}
                         <div className="absolute inset-0 flex items-center justify-center px-6 pb-8">
                           <p
-                            className="text-[#111111] text-center break-words"
+                            className="text-center break-words"
                             style={{
                               fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                               fontSize: '30px',
                               letterSpacing: '0.14em',
                               lineHeight: '1.3',
+                              color: themeColors.textMain,
                             }}
                           >
                             {word.text}
@@ -332,30 +309,21 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
                             e.stopPropagation();
                             handlePlayPronunciation(word.text);
                           }}
-                          className="absolute bg-[#d4e7f5] box-border flex items-center justify-center right-3 top-3 rounded-full shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)] size-[45px] hover:bg-[#c5dcf0] hover:shadow-md transition-all"
+                          className="absolute box-border flex items-center justify-center right-3 top-3 rounded-full shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)] size-[45px] hover:shadow-md transition-all"
+                          style={{
+                            backgroundColor: themeColors.accentMain,
+                          }}
                           aria-label="Phát âm"
                         >
                           <div className="relative shrink-0 size-[22.5px]">
                             <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 23 23">
                               <g>
-                                <path d={svgPaths.p1a0f8580} stroke="#111111" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.875" />
-                                <path d={svgPaths.p8a5a680} stroke="#111111" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.875" />
-                                <path d={svgPaths.p2f3abf00} stroke="#111111" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.875" />
+                                <path d={svgPaths.p1a0f8580} stroke={themeColors.textMain} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.875" />
+                                <path d={svgPaths.p8a5a680} stroke={themeColors.textMain} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.875" />
+                                <path d={svgPaths.p2f3abf00} stroke={themeColors.textMain} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.875" />
                               </g>
                             </svg>
                           </div>
-                        </button>
-
-                        {/* Delete Button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteWord(word.id, word.text);
-                          }}
-                          className="absolute bg-[#FAD4D4] box-border flex items-center justify-center left-3 top-3 rounded-full shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_-1px_rgba(0,0,0,0.1)] size-[45px] hover:bg-[#F5BABA] hover:shadow-md transition-all"
-                          aria-label="Xóa từ"
-                        >
-                          <X className="w-5 h-5 text-[#111111]" strokeWidth={2.5} />
                         </button>
                       </div>
                     ))}
@@ -369,7 +337,12 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         {/* Alphabet Filter - Fixed on Right Side with Scroll and Gradients */}
         <div className="fixed right-4 top-[10%] bottom-[15%] w-[70px] z-10 flex flex-col">
           {/* Top Gradient Fade */}
-          <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-[#fff8e7] to-transparent pointer-events-none z-20" />
+          <div
+            className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-20"
+            style={{
+              background: `linear-gradient(to bottom, ${themeColors.appBackground} 0%, transparent 100%)`,
+            }}
+          />
 
           {/* Scrollable Alphabet Container */}
           <div
@@ -385,22 +358,23 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
                 <button
                   key={letter}
                   onClick={() => setSelectedLetter(selectedLetter === letter ? null : letter)}
-                  className={`rounded-full transition-all flex items-center justify-center shrink-0 ${selectedLetter === letter
-                    ? 'bg-[#c8e4f5] shadow-md w-[56px] h-[56px]'
-                    : 'bg-[#fffcf2] hover:bg-[#fff4e0] shadow-sm w-[50px] h-[50px]'
-                    }`}
+                  className="rounded-full transition-all flex items-center justify-center shrink-0 border-2"
                   style={{
-                    border: '2px solid #e0dccc',
+                    backgroundColor: selectedLetter === letter ? themeColors.accentMain : themeColors.cardBackground,
+                    borderColor: themeColors.border,
+                    width: selectedLetter === letter ? '56px' : '50px',
+                    height: selectedLetter === letter ? '56px' : '50px',
+                    boxShadow: selectedLetter === letter ? '0 4px 6px -1px rgba(0,0,0,0.1)' : '0 1px 3px 0 rgba(0,0,0,0.1)',
                   }}
                   aria-label={`Lọc từ bắt đầu bằng ${letter}`}
                 >
                   <p
-                    className="text-[#111111]"
                     style={{
                       fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                       fontSize: selectedLetter === letter ? '24px' : '22px',
                       letterSpacing: '0.02em',
                       fontWeight: selectedLetter === letter ? '600' : '400',
+                      color: themeColors.textMain,
                     }}
                   >
                     {letter}
@@ -411,20 +385,28 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
           </div>
 
           {/* Bottom Gradient Fade */}
-          <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#fff8e7] to-transparent pointer-events-none z-20" />
+          <div
+            className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none z-20"
+            style={{
+              background: `linear-gradient(to top, ${themeColors.appBackground} 0%, transparent 100%)`,
+            }}
+          />
         </div>
 
         {/* Floating Action Button (FAB) - Add New Word */}
         <button
           onClick={handleAddWord}
-          className="fixed bottom-6 right-6 bg-[#d4e7f5] box-border flex items-center justify-center rounded-full shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] size-[64px] z-30 hover:bg-[#c5dcf0] hover:shadow-xl transition-all"
+          className="fixed bottom-6 right-6 box-border flex items-center justify-center rounded-full shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] size-[64px] z-30 hover:shadow-xl transition-all"
+          style={{
+            backgroundColor: themeColors.accentMain,
+          }}
           aria-label="Thêm từ mới"
         >
           <div className="relative shrink-0 size-[32px]">
             <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 36 36">
               <g>
-                <path d="M7.5 18H28.5" stroke="#111111" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-                <path d="M18 7.5V28.5" stroke="#111111" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+                <path d="M7.5 18H28.5" stroke={themeColors.textMain} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+                <path d="M18 7.5V28.5" stroke={themeColors.textMain} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
               </g>
             </svg>
           </div>
@@ -432,17 +414,25 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
         {/* Add Word Popup */}
         {isAddWordPopupOpen && (
-          <div className="fixed inset-0 backdrop-blur-sm bg-[#fff8e7] bg-opacity-60 z-40 flex items-center justify-center">
+          <div
+            className="fixed inset-0 backdrop-blur-sm bg-opacity-60 z-40 flex items-center justify-center"
+            style={{ backgroundColor: `${themeColors.appBackground}99` }}
+          >
             <div
               ref={popupRef}
-              className="bg-[#fffcf2] rounded-3xl border-2 border-[#e0dccc] shadow-2xl p-8 w-[420px]"
+              className="rounded-3xl border-2 shadow-2xl p-8 w-[420px]"
+              style={{
+                backgroundColor: themeColors.cardBackground,
+                borderColor: themeColors.border,
+              }}
             >
               <h3
-                className="text-[#111111] mb-6 text-center"
+                className="mb-6 text-center"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                   fontSize: '28px',
                   letterSpacing: '0.12em',
+                  color: themeColors.textMain,
                 }}
               >
                 Thêm từ mới
@@ -461,11 +451,14 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
                 maxLength={15}
                 placeholder="Nhập từ mới..."
                 autoFocus
-                className="w-full bg-[#fff8e7] border-2 border-[#e0dccc] rounded-2xl px-6 py-4 mb-2 text-[#111111] placeholder:text-[#999999] focus:outline-none focus:border-[#d4c5a9] focus:ring-0 shadow-sm transition-all"
+                className="w-full border-2 rounded-2xl px-6 py-4 mb-2 placeholder:text-[#999999] focus:outline-none focus:ring-0 shadow-sm transition-all"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                   fontSize: '24px',
                   letterSpacing: '0.12em',
+                  backgroundColor: themeColors.appBackground,
+                  borderColor: themeColors.border,
+                  color: themeColors.textMain,
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -476,10 +469,11 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
               {/* Character Counter */}
               <div
-                className="text-right text-[#666666] mb-6"
+                className="text-right mb-6"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                   fontSize: '18px',
+                  color: themeColors.textMuted,
                 }}
               >
                 {newWordInput.length}/15
@@ -494,18 +488,22 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
                   aria-label="Huỷ"
                   title="Huỷ"
                 >
-                  <X className="w-7 h-7 text-[#111111]" strokeWidth={3} />
+                  <X className="w-7 h-7" style={{ color: themeColors.textMain }} strokeWidth={3} />
                 </button>
 
                 {/* Confirm Button (✓) */}
                 <button
                   onClick={handleConfirmAddWord}
                   disabled={!newWordInput.trim()}
-                  className="w-14 h-14 rounded-full bg-[#D4E7F5] hover:bg-[#C5DCF0] border-2 border-[#B8D4E8] flex items-center justify-center transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-14 h-14 rounded-full border-2 flex items-center justify-center transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: themeColors.accentMain,
+                    borderColor: themeColors.accentHover,
+                  }}
                   aria-label="Xác nhận"
                   title="Xác nhận"
                 >
-                  <Check className="w-8 h-8 text-[#111111]" strokeWidth={3} />
+                  <Check className="w-8 h-8" style={{ color: themeColors.textMain }} strokeWidth={3} />
                 </button>
               </div>
             </div>
