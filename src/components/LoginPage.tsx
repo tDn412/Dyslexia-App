@@ -1,19 +1,57 @@
 import { useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { toast } from 'sonner';
 import svgPaths from '../imports/svg-3zpfms6l7d';
 
 interface LoginPageProps {
-  onLogin: () => void;
+  onLogin: (userId: string) => void;
   onNavigateToRegister?: () => void;
 }
 
 export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    // Simple validation - in real app, this would connect to authentication service
-    if (username.trim() && password.trim()) {
-      onLogin();
+  const handleLogin = async () => {
+    if (!username.trim() || !password.trim()) return;
+
+    try {
+      setIsLoading(true);
+
+      // Query User table for matching username and password
+      const { data, error } = await supabase
+        .from('User')
+        .select('userid, username, password')
+        .eq('username', username.trim())
+        .single();
+
+      if (error || !data) {
+        toast.error('Tên đăng nhập không tồn tại!');
+        setIsLoading(false);
+        return;
+      }
+
+      // Check password (in real app, should use hashed passwords)
+      if (data.password !== password) {
+        toast.error('Mật khẩu không đúng!');
+        setIsLoading(false);
+        return;
+      }
+
+      // Login successful
+      toast.success('Đăng nhập thành công!');
+
+      // Store user ID in localStorage
+      localStorage.setItem('userId', data.userid);
+      localStorage.setItem('username', data.username);
+
+      onLogin(data.userid);
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error('Lỗi khi đăng nhập. Vui lòng thử lại.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -51,11 +89,13 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
             {/* Login Button */}
             <button
               onClick={handleLogin}
-              disabled={!username.trim() || !password.trim()}
+              disabled={!username.trim() || !password.trim() || isLoading}
               className="absolute bg-white h-[97px] left-[calc(50%+0.5px)] rounded-[27px] top-[479px] translate-x-[-50%] w-[480px] transition-all hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="h-[97px] overflow-clip relative rounded-[inherit] w-[480px]">
-                <p className="absolute font-['Lexend',sans-serif] font-normal leading-[normal] left-1/2 text-[#999999] text-[40px] text-center text-nowrap top-[calc(50%-24.5px)] tracking-[3.12px] translate-x-[-50%] whitespace-pre">Đăng Nhập</p>
+                <p className="absolute font-['Lexend',sans-serif] font-normal leading-[normal] left-1/2 text-[#999999] text-[40px] text-center text-nowrap top-[calc(50%-24.5px)] tracking-[3.12px] translate-x-[-50%] whitespace-pre">
+                  {isLoading ? 'Đang đăng nhập...' : 'Đăng Nhập'}
+                </p>
               </div>
               <div aria-hidden="true" className="absolute border-2 border-[#e0dccc] border-solid inset-0 pointer-events-none rounded-[27px]" />
             </button>
@@ -74,7 +114,7 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
             {/* Form Container */}
             <div className="absolute bg-[#fffcf2] box-border content-stretch flex flex-col gap-[36px] h-[455px] items-start left-[0.5px] pb-[2px] pt-[56px] px-[56px] rounded-[40.5px] top-[-0.39px] w-[777px]">
               <div aria-hidden="true" className="absolute border-2 border-[#e8dcc8] border-solid inset-0 pointer-events-none rounded-[40.5px] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)]" />
-              
+
               {/* Username Field */}
               <div className="content-stretch flex flex-col gap-[18px] h-[157px] items-start relative shrink-0 w-full">
                 <div className="h-[42px] relative shrink-0 w-full">

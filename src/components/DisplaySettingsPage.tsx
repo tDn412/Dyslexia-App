@@ -3,8 +3,8 @@ import { Slider } from './ui/slider';
 import { Input } from './ui/input';
 import { Check, ArrowLeft, Save } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { api } from '../utils/api';
 import { toast } from 'sonner';
+import { supabase } from '../lib/supabaseClient';
 
 interface DisplaySettingsPageProps {
   onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
@@ -60,15 +60,29 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const userId = localStorage.getItem('userId') || 'demo';
-        const response = await api.settings.getDisplay(userId);
-        
-        if (response.data) {
-          setSelectedFont(response.data.fontFamily || fontOptions[2].value);
-          setFontSize(response.data.fontSize || 26);
-          setLetterSpacing(response.data.letterSpacing || 0.14);
-          setLineSpacing(response.data.lineSpacing || 1.8);
-          setSelectedTheme(typeof response.data.theme === 'number' ? response.data.theme : 0);
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+          setIsLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('UserSetting')
+          .select('*')
+          .eq('userid', userId)
+          .single();
+
+        if (error) {
+          console.error('Supabase error:', error);
+        } else if (data) {
+          setSelectedFont(data.fontfamily || fontOptions[2].value);
+          setFontSize(data.fontsize || 26);
+          setLetterSpacing(data.letterspacing || 0.14);
+          setLineSpacing(data.linespacing || 1.8);
+
+          // Parse color theme from colortheme field
+          const themeIndex = colorThemes.findIndex(t => t.background === data.colortheme);
+          setSelectedTheme(themeIndex >= 0 ? themeIndex : 0);
         }
       } catch (error) {
         console.error('Error loading settings:', error);
@@ -90,21 +104,28 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
 
   const handleSave = async () => {
     try {
-      const userId = localStorage.getItem('userId') || 'demo';
-      const response = await api.settings.updateDisplay(
-        {
-          fontFamily: selectedFont,
-          fontSize,
-          letterSpacing,
-          lineSpacing,
-          theme: selectedTheme,
-        },
-        userId
-      );
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        toast.error('Vui lòng đăng nhập lại');
+        return;
+      }
 
-      if (response.error) {
+      const currentTheme = colorThemes[selectedTheme];
+
+      const { error } = await supabase
+        .from('UserSetting')
+        .upsert({
+          userid: userId,
+          fontfamily: selectedFont,
+          fontsize: fontSize,
+          letterspacing: letterSpacing,
+          linespacing: lineSpacing,
+          colortheme: currentTheme.background,
+        });
+
+      if (error) {
         toast.error('Không thể lưu cài đặt. Vui lòng thử lại.');
-        console.error('Save settings error:', response.error);
+        console.error('Supabase error:', error);
       } else {
         toast.success('Đã lưu cài đặt thành công!');
         if (onNavigate) {
@@ -134,7 +155,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
             >
               <ArrowLeft className="w-5 h-5 text-[#111111]" />
             </button>
-            <h1 
+            <h1
               className="text-[#111111]"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -146,7 +167,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
 
           {/* Preview Box */}
           <div className="mb-10">
-            <div 
+            <div
               className="rounded-3xl border-2 shadow-lg p-12 flex items-center justify-center min-h-[160px]"
               style={{
                 backgroundColor: currentTheme.background,
@@ -169,7 +190,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
 
           {/* Font Selection */}
           <div className="mb-10">
-            <label 
+            <label
               className="block text-[#111111] mb-5"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -184,11 +205,10 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
                 <button
                   key={font.value}
                   onClick={() => setSelectedFont(font.value)}
-                  className={`px-8 py-3 rounded-2xl border-2 transition-all shadow-sm ${
-                    selectedFont === font.value
+                  className={`px-8 py-3 rounded-2xl border-2 transition-all shadow-sm ${selectedFont === font.value
                       ? 'bg-[#D4E7F5] border-[#B8D4E8] text-[#111111]'
                       : 'bg-[#FFF8E7] border-[#E0DCCC] text-[#111111] hover:bg-[#FFF4E0]'
-                  }`}
+                    }`}
                   style={{
                     fontFamily: font.value,
                     fontSize: '20px',
@@ -203,7 +223,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
           {/* Font Size */}
           <div className="mb-8">
             <div className="flex items-center gap-6">
-              <label 
+              <label
                 className="text-[#111111] w-48 flex-shrink-0"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -242,7 +262,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
           {/* Letter Spacing */}
           <div className="mb-8">
             <div className="flex items-center gap-6">
-              <label 
+              <label
                 className="text-[#111111] w-48 flex-shrink-0"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -281,7 +301,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
           {/* Line Spacing */}
           <div className="mb-8">
             <div className="flex items-center gap-6">
-              <label 
+              <label
                 className="text-[#111111] w-48 flex-shrink-0"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -319,7 +339,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
 
           {/* Color Theme */}
           <div className="mb-10">
-            <label 
+            <label
               className="block text-[#111111] mb-5"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -334,18 +354,17 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
                 <button
                   key={index}
                   onClick={() => setSelectedTheme(index)}
-                  className={`relative w-16 h-16 rounded-full border-4 transition-all ${
-                    selectedTheme === index
+                  className={`relative w-16 h-16 rounded-full border-4 transition-all ${selectedTheme === index
                       ? 'border-[#111111] scale-110'
                       : 'border-[#E0DCCC] hover:scale-105'
-                  }`}
+                    }`}
                   style={{
                     backgroundColor: theme.background,
                   }}
                   aria-label={theme.name}
                 >
                   {selectedTheme === index && (
-                    <div 
+                    <div
                       className="absolute inset-0 flex items-center justify-center"
                       style={{ color: theme.text }}
                     >

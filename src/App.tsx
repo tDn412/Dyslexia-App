@@ -1,6 +1,6 @@
 import { BookOpen, Mic, ArrowRight } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { ReadingPage } from './components/ReadingPage';
@@ -12,17 +12,29 @@ import { SettingsOverviewPage } from './components/SettingsOverviewPage';
 import { DisplaySettingsPage } from './components/DisplaySettingsPage';
 import { AudioSettingsPage } from './components/AudioSettingsPage';
 import { OCRImportPage } from './components/OCRImportPage';
+import { SettingsProvider } from './contexts/SettingsContext';
 import svgPaths from './imports/svg-jkvvruu31p';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const [showRegister, setShowRegister] = useState(false);
   const [currentPage, setCurrentPage] = useState<'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport'>('Home');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedReadingId, setSelectedReadingId] = useState<string | null>(null);
   const [selectedSpeakingId, setSelectedSpeakingId] = useState<string | null>(null);
 
-  const handleLogin = () => {
+  // Check for existing session on mount
+  useEffect(() => {
+    const storedUserId = localStorage.getItem('userId');
+    if (storedUserId) {
+      setUserId(storedUserId);
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = (loggedInUserId: string) => {
+    setUserId(loggedInUserId);
     setIsAuthenticated(true);
     setShowRegister(false);
   };
@@ -34,6 +46,11 @@ export default function App() {
   };
 
   const handleSignOut = () => {
+    // Clear localStorage
+    localStorage.removeItem('userId');
+    localStorage.removeItem('username');
+
+    setUserId(null);
     setIsAuthenticated(false);
     setShowRegister(false);
     setCurrentPage('Home');

@@ -1,7 +1,7 @@
 import { Sidebar } from "./Sidebar";
 import { ReadingCard } from "./ReadingCard";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 type PageType =
@@ -34,8 +34,7 @@ export function SpeakingSelectionPage({
   const [selectedLevel, setSelectedLevel] = useState<string>('All');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [topicScrollIndex, setTopicScrollIndex] = useState(0);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [speakings, setSpeakings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false); const [isLoadingNLP, setIsLoadingNLP] = useState(false);
   const [processedSentences, setProcessedSentences] = useState<string[]>([]);
@@ -83,13 +82,6 @@ export function SpeakingSelectionPage({
         query = query.eq("topic", selectedTopic);
       }
 
-      // Search filter (title & topic)
-      if (search.trim() !== "") {
-        query = query.or(
-          `title.ilike.%${search}%,topic.ilike.%${search}%`
-        );
-      }
-
       const { data, error } = await query;
 
       if (error) console.error("Error fetching readings:", error);
@@ -97,14 +89,17 @@ export function SpeakingSelectionPage({
     }
 
     fetchSpeakings();
-  }, [selectedLevel, selectedTopic, search]);
+  }, [selectedLevel, selectedTopic]);
 
-  // Apply all filters
-  const filteredSpeakings = speakings.filter((speaking) => {
-    const levelMatch = selectedLevel === 'All' || speaking.level === selectedLevel;
-    const topicMatch = !selectedTopic || speaking.topic === selectedTopic;
-    return levelMatch && topicMatch;
-  });
+  // Filter speakings based on search query (title only)
+  const filteredSpeakings = useMemo(() => {
+    if (!searchQuery.trim()) return speakings;
+
+    const query = searchQuery.toLowerCase();
+    return speakings.filter(speaking =>
+      speaking.title?.toLowerCase().includes(query)
+    );
+  }, [speakings, searchQuery]);
 
   function handleOpenSpeaking(speaking: any) {
     console.log("OPEN READING:", speaking);            // 👈 xem toàn bộ object
@@ -130,14 +125,13 @@ export function SpeakingSelectionPage({
           <div className="mb-8">
             <div className="relative">
               <Search
-                className="absolute left-6 top-1/2 transform -translate-y-1/2 w-7 h-7 text-[#666666] cursor-pointer"
-                onClick={() => setSearch(searchInput)}     // 🔥 bấm vào mới search
+                className="absolute left-6 top-1/2 transform -translate-y-1/2 w-7 h-7 text-[#666666]"
               />
               <input
                 type="text"
                 placeholder="Tìm kiếm bài nói..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-[#FFFCF2] border-2 border-[#E0DCCC] rounded-3xl pl-16 pr-6 py-5 text-[#111] placeholder:text-[#999] focus:outline-none focus:border-[#D4C5A9] shadow-md"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",

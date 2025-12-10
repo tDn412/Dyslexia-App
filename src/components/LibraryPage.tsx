@@ -5,6 +5,7 @@ import { Check, X } from 'lucide-react';
 import { speakText } from '../utils/textToSpeech';
 import { toast } from 'sonner';
 import { api } from '../utils/api';
+import { supabase } from '../lib/supabaseClient';
 
 interface LibraryPageProps {
   onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
@@ -36,39 +37,46 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     'U', 'Ư', 'V', 'X', 'Y'
   ];
 
-  // Load words from backend on mount
+  // Load words from Supabase on mount
   useEffect(() => {
     const loadWords = async () => {
       setIsLoadingWords(true);
 
-      // thử load từ localStorage trước
-      const cached = localStorage.getItem('words');
-      if (cached) {
-        setWords(JSON.parse(cached).map((w: any) => ({
-          ...w,
-          dateAdded: new Date(w.dateAdded)
-        })));
+      // Get userId from localStorage
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
         setIsLoadingWords(false);
         return;
       }
 
       try {
-        const response = await api.library.getWords();
-        console.log("RAW RESPONSE:", response);
+        const { data, error } = await supabase
+          .from('LibraryWord')
+          .select('*')
+          .eq('userid', userId)
+          .order('createdat', { ascending: false });
 
-        if (response.data && response.data.length > 0) {
-          const loadedWords = response.data.map((w: any) => ({
-            id: w.id,
-            text: w.text,
-            dateAdded: new Date(w.dateAdded)
+        console.log('Loaded words from Supabase:', { data, error });
+
+        if (error) {
+          console.error('Supabase Error:', error);
+          setIsLoadingWords(false);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          const loadedWords = data.map((w: any) => ({
+            id: w.wordid,
+            text: w.word,
+            dateAdded: new Date(w.createdat)
           }));
 
           setWords(loadedWords);
-          localStorage.setItem("words", JSON.stringify(loadedWords));
+          localStorage.setItem('words', JSON.stringify(loadedWords));
         }
 
       } catch (error) {
-        console.error(error);
+        console.error('Error loading words:', error);
       } finally {
         setIsLoadingWords(false);
       }
@@ -153,18 +161,48 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     const trimmedWord = newWordInput.trim();
     if (!trimmedWord) return;
 
+    console.log('Adding word:', trimmedWord); // Debug
+
     try {
-      const response = await api.library.addWord({
-        text: trimmedWord
-      });
+      // Get userId from localStorage
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        toast.error('Vui lòng đăng nhập lại');
+        return;
+      }
+
+      // Generate unique wordid (VARCHAR type)
+      const wordid = 'w' + Date.now();
+
+      // Insert directly to Supabase
+      const { data, error } = await supabase
+        .from('LibraryWord')
+        .insert({
+          wordid: wordid,
+          userid: userId,
+          word: trimmedWord,
+        })
+        .select()
+        .single();
+
+      console.log('Supabase response:', { data, error }); // Debug
+
+      if (error) {
+        console.error('Supabase Error:', error);
+        toast.error('Lỗi khi thêm từ: ' + error.message);
+        return;
+      }
 
       const newWord: Word = {
-        id: response.data.id,
-        text: response.data.text,
-        dateAdded: new Date(response.data.dateAdded),
+        id: data.wordid,
+        text: data.word,
+        dateAdded: new Date(data.createdat),
       };
 
+      console.log('New word created:', newWord); // Debug
+
       setWords((prev) => [newWord, ...prev]);
+      localStorage.setItem('words', JSON.stringify([newWord, ...words]));
       setIsAddWordPopupOpen(false);
       setNewWordInput('');
       toast.success(`Đã thêm từ "${newWord.text}" vào thư viện!`);

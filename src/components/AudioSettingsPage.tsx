@@ -5,7 +5,7 @@ import { Slider } from './ui/slider';
 import { Input } from './ui/input';
 import { speakText, getVoices, isSpeechSynthesisSupported } from '../utils/textToSpeech';
 import { toast } from 'sonner';
-import { api } from '../utils/api';
+import { supabase } from '../lib/supabaseClient';
 
 interface AudioSettingsPageProps {
   onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
@@ -37,12 +37,23 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const userId = localStorage.getItem('userId') || 'demo';
-        const response = await api.settings.getAudio(userId);
-        
-        if (response.data) {
-          setSelectedVoice(response.data.voice || 'male-1');
-          setReadingSpeed(response.data.speechRate || 1.0);
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+          setIsLoading(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('UserSetting')
+          .select('*')
+          .eq('userid', userId)
+          .single();
+
+        if (error) {
+          console.error('Supabase error:', error);
+        } else if (data) {
+          setSelectedVoice(data.readingvoice || 'male-1');
+          setReadingSpeed(data.readingspeed || 1.0);
         }
       } catch (error) {
         console.error('Error loading settings:', error);
@@ -89,20 +100,23 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
 
   const handleSave = async () => {
     try {
-      const userId = localStorage.getItem('userId') || 'demo';
-      const response = await api.settings.updateAudio(
-        {
-          voice: selectedVoice,
-          speechRate: readingSpeed,
-          pitch: 1.0,
-          volume: 1.0,
-        },
-        userId
-      );
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        toast.error('Vui lòng đăng nhập lại');
+        return;
+      }
 
-      if (response.error) {
+      const { error } = await supabase
+        .from('UserSetting')
+        .upsert({
+          userid: userId,
+          readingvoice: selectedVoice,
+          readingspeed: readingSpeed,
+        });
+
+      if (error) {
         toast.error('Không thể lưu cài đặt. Vui lòng thử lại.');
-        console.error('Save settings error:', response.error);
+        console.error('Supabase error:', error);
       } else {
         toast.success('Đã lưu cài đặt thành công!');
         if (onNavigate) {
@@ -162,7 +176,7 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
             >
               <ArrowLeft className="w-6 h-6 text-[#111111]" />
             </button>
-            <h1 
+            <h1
               className="text-[#111111]"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -176,7 +190,7 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
           <div className="bg-[#FFFCF2] rounded-2xl border-2 border-[#E0DCCC] shadow-lg p-8 flex-1 flex flex-col overflow-hidden">
             {/* Listening Preview Section */}
             <div className="mb-6 flex-shrink-0">
-              <label 
+              <label
                 className="block text-[#111111] mb-3"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -211,7 +225,7 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
             {/* Reading Speed Section */}
             <div className="mb-6 flex-shrink-0">
               <div className="flex items-center gap-6">
-                <label 
+                <label
                   className="text-[#111111] w-48 flex-shrink-0"
                   style={{
                     fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -249,7 +263,7 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
 
             {/* Male Voices Section */}
             <div className="mb-6 flex-shrink-0">
-              <label 
+              <label
                 className="block text-[#111111] mb-3"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -264,11 +278,10 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
                   <button
                     key={voice.id}
                     onClick={() => handleVoiceSelect(voice.id)}
-                    className={`flex-1 px-5 py-4 rounded-2xl border-2 transition-all shadow-sm ${
-                      selectedVoice === voice.id
+                    className={`flex-1 px-5 py-4 rounded-2xl border-2 transition-all shadow-sm ${selectedVoice === voice.id
                         ? 'bg-[#D4E7F5] border-[#B8D4E8] shadow-md ring-2 ring-[#B8D4E8] ring-offset-2 ring-offset-[#FFFCF2]'
                         : 'bg-[#FFF8E7] border-[#E0DCCC] hover:bg-[#FFF4E0] hover:shadow-md'
-                    }`}
+                      }`}
                     style={{
                       fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                       fontSize: '18px',
@@ -283,7 +296,7 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
 
             {/* Female Voices Section */}
             <div className="mb-6 flex-shrink-0">
-              <label 
+              <label
                 className="block text-[#111111] mb-3"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -298,11 +311,10 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
                   <button
                     key={voice.id}
                     onClick={() => handleVoiceSelect(voice.id)}
-                    className={`flex-1 px-5 py-4 rounded-2xl border-2 transition-all shadow-sm ${
-                      selectedVoice === voice.id
+                    className={`flex-1 px-5 py-4 rounded-2xl border-2 transition-all shadow-sm ${selectedVoice === voice.id
                         ? 'bg-[#D4E7F5] border-[#B8D4E8] shadow-md ring-2 ring-[#B8D4E8] ring-offset-2 ring-offset-[#FFFCF2]'
                         : 'bg-[#FFF8E7] border-[#E0DCCC] hover:bg-[#FFF4E0] hover:shadow-md'
-                    }`}
+                      }`}
                     style={{
                       fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                       fontSize: '18px',
