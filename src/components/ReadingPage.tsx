@@ -6,7 +6,8 @@ import { Plus, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from './ThemeContext';
 import { useDisplaySettings } from './DisplaySettingsContext';
-import { fetchReadingById, addToLibrary } from '../utils/api';
+import { api, addToLibrary, fetchReadingById } from '../utils/api';
+import { speakText, stopSpeaking, pauseSpeaking, resumeSpeaking } from '../utils/textToSpeech';
 
 interface ReadingPageProps {
   onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport' | 'Exercise') => void;
@@ -131,6 +132,7 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   const [isSyllableMode, setIsSyllableMode] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 });
   const [boldWords, setBoldWords] = useState<Set<string>>(new Set());
@@ -145,11 +147,15 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   const [readingTitle, setReadingTitle] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
+  // NLP States
+  const [processedSentences, setProcessedSentences] = useState<string[]>([]);
+  const [processedWords, setProcessedWords] = useState<string[][]>([]);
+  const [isLoadingNLP, setIsLoadingNLP] = useState(true);
+
   useEffect(() => {
     const loadReading = async () => {
       const id = localStorage.getItem('currentReadingId');
       if (!id) {
-        // Fallback or redirect
         setReadingContent("Không tìm thấy bài đọc. Vui lòng chọn bài đọc từ danh sách.");
         setLoading(false);
         return;
@@ -169,6 +175,35 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     loadReading();
   }, []);
 
+  // ---------------- LOAD NLP -----------------
+  useEffect(() => {
+    if (!readingContent) return;
+
+    const loadNLP = async () => {
+      try {
+        setIsLoadingNLP(true);
+        const response = await api.nlp.segment(readingContent);
+
+        if (response.data) {
+          setProcessedSentences(response.data.sentences);
+          setProcessedWords(response.data.words_per_sentence);
+        } else {
+          setProcessedSentences(readingContent.match(/[^.!?]+[.!?]+/g) || [readingContent]);
+        }
+      } catch (error) {
+        console.error("NLP Error:", error);
+        setProcessedSentences(readingContent.match(/[^.!?]+[.!?]+/g) || [readingContent]);
+      } finally {
+        setIsLoadingNLP(false);
+      }
+    };
+
+    loadNLP();
+  }, [readingContent]);
+
+  // Cleanup on unmount
+  useEffect(() => { return () => stopSpeaking(); }, []);
+
   const handleWordClick = (word: string, event: React.MouseEvent) => {
     const rect = (event.target as HTMLElement).getBoundingClientRect();
     setSelectedWord(word);
@@ -180,8 +215,6 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
   const handleAddToLibrary = async (word: string) => {
     try {
-      // Assuming user ID is stored or we use a demo ID
-      // userId is now from props
       await addToLibrary(userId, word);
       toast.success(`"${word}" đã được thêm vào thư viện!`);
     } catch (error) {
@@ -201,45 +234,26 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     });
   };
 
-  const handlePlayWord = (word: string) => {
-    toast.info(`Đang phát âm: "${word}"`);
-    // Use Web Speech API
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(word);
-      utterance.lang = 'vi-VN';
-
-      // Try to find a Vietnamese voice
-      const voices = window.speechSynthesis.getVoices();
-      const vietnameseVoice = voices.find(voice =>
-        voice.lang.includes('vi') || voice.lang.includes('VN')
-      );
-
-      if (vietnameseVoice) {
-        utterance.voice = vietnameseVoice;
-      }
-
-      window.speechSynthesis.speak(utterance);
-    } else {
-      toast.error("Trình duyệt không hỗ trợ đọc văn bản.");
+  const handlePlayWord = async (word: string) => {
+    try {
+      await speakText({ text: word, lang: 'vi-VN', rate: 1.0 });
+    } catch {
+      toast.error('Không thể phát âm. Vui lòng thử lại.');
     }
   };
-
 
   // Highlight mirror letters
   const highlightMirrorLetters = (text: string) => {
     if (!isMirrorEnabled) return text;
-
-    const mirrorLetters = ['b', 'd', 'p', 'q', 'B', 'D', 'P', 'Q'];
-    const chars = text.split('');
-
-    return chars.map((char, index) => {
-      if (mirrorLetters.includes(char)) {
+    // Simple mock mirror check
+    const mirrorLetters = ['b', 'd', 'p', 'q', 'm', 'n', 'u'];
+    return text.split('').map((char, index) => {
+      const lowerChar = char.toLowerCase();
+      if (mirrorLetters.includes(lowerChar)) {
+        let color = '#CBE7FF';
+        if (['p', 'q', 'b', 'd'].includes(lowerChar)) color = '#FAD4D4';
         return (
-          <span
-            key={index}
-            className="rounded px-0.5"
-            style={{ backgroundColor: '#CBE7FF' }}
-          >
+          <span key={index} className="rounded px-0.5" style={{ backgroundColor: color }}>
             {char}
           </span>
         );
@@ -248,92 +262,50 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     });
   };
 
-  // Split text into interactive words
-  const renderInteractiveText = () => {
-    const words = readingContent.split(/(\s+)/);
-    return words.map((segment, index) => {
-      const trimmedWord = segment.trim();
-      if (!trimmedWord) return <span key={index}>{segment}</span>;
+  // Render text with interactive words using processed NLP data
+  const renderInteractiveText = (): React.ReactNode => {
+    if (isLoadingNLP) return <p>Đang tải văn bản...</p>;
 
-      const isBold = boldWords.has(trimmedWord);
+    return processedSentences.map((sentence, sIdx) => {
+      const words = processedWords[sIdx] || sentence.split(/(\s+)/);
 
       return (
-        <span
-          key={index}
-          onClick={(e) => handleWordClick(trimmedWord, e)}
-          className="cursor-pointer rounded px-1 transition-colors inline-block"
-          style={{
-            fontWeight: isBold ? 'bold' : 'normal',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = `${themeColors.accentMain}80`;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-        >
-          {highlightMirrorLetters(segment)}
-        </span>
-      );
-    });
-  };
-
-  // Split text into sentences for Focus Mode
-  const sentences = readingContent.match(/[^.!?]+[.!?]+/g) || [readingContent];
-
-  // Render text in Focus Mode (line by line)
-  const renderFocusModeText = () => {
-    return sentences.map((sentence, index) => {
-      const words = sentence.split(/(\s+)/);
-      const opacity = getLineOpacity(index);
-
-      return (
-        <div
-          key={index}
-          ref={(el) => { lineRefs.current[index] = el; }}
-          onClick={() => setCurrentLineIndex(index)}
-          className="cursor-pointer transition-opacity duration-500 mb-6"
-          style={{
-            opacity,
-            fontWeight: index === currentLineIndex ? '600' : 'normal',
-          }}
-        >
-          {words.map((segment, wordIndex) => {
+        <span key={sIdx}>
+          {words.map((segment, wIdx) => {
             const trimmedWord = segment.trim();
-            if (!trimmedWord) return <span key={wordIndex}>{segment}</span>;
+
+            if (!trimmedWord) return <span key={wIdx}>{segment}</span>;
 
             const isBold = boldWords.has(trimmedWord);
 
             return (
-              <span
-                key={wordIndex}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleWordClick(trimmedWord, e);
-                }}
-                className="rounded px-1 transition-colors inline-block"
-                style={{
-                  fontWeight: isBold ? 'bold' : 'normal',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = `${themeColors.accentMain}80`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                {highlightMirrorLetters(segment)}
+              <span key={wIdx}>
+                <span
+                  onClick={(e) => handleWordClick(trimmedWord, e)}
+                  className="cursor-pointer rounded px-1 transition-colors inline-block"
+                  style={{
+                    fontWeight: isBold ? 'bold' : 'normal',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `${themeColors.accentMain}80`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  {highlightMirrorLetters(segment)}
+                </span>
+                {processedWords[sIdx] ? ' ' : ''}
               </span>
             );
           })}
-        </div>
+        </span>
       );
     });
   };
 
   const handleQuickSettingsToggle = () => {
     if (!isQuickSettingsOpen && !isSidebarCollapsed) {
-      // Opening quick settings - collapse left sidebar
       onToggleCollapse?.();
     }
     setIsQuickSettingsOpen(!isQuickSettingsOpen);
@@ -349,8 +321,6 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         const containerHeight = container.clientHeight;
         const lineTop = currentLine.offsetTop;
         const lineHeight = currentLine.clientHeight;
-
-        // Calculate scroll position to center the line
         const scrollTo = lineTop - (containerHeight / 2) + (lineHeight / 2);
 
         container.scrollTo({
@@ -379,30 +349,21 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFocusMode, currentLineIndex, sentences.length]);
+  }, [isFocusMode, currentLineIndex, processedSentences.length]);
 
   // Handle mouse wheel scrolling in Focus Mode
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
       if (!isFocusMode) return;
-
-      // Prevent default scrolling behavior in Focus Mode
       event.preventDefault();
-
-      // Throttle: only change line if enough time has passed
       const now = Date.now();
       if (now - lastScrollTime.current < scrollThrottle) {
         return;
       }
-
       lastScrollTime.current = now;
-
-      // Determine scroll direction
       if (event.deltaY > 0) {
-        // Scrolling down - next line
         handleNextLine();
       } else if (event.deltaY < 0) {
-        // Scrolling up - previous line
         handlePreviousLine();
       }
     };
@@ -417,75 +378,96 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         readingBox.removeEventListener('wheel', handleWheel);
       }
     };
-  }, [isFocusMode, currentLineIndex, sentences.length]);
+  }, [isFocusMode, currentLineIndex, processedSentences.length]);
 
   // Calculate opacity for each line in Focus Mode
   const getLineOpacity = (lineIndex: number) => {
     if (!isFocusMode) return 1;
-
     const distance = Math.abs(lineIndex - currentLineIndex);
-
-    if (distance === 0) return 1; // Current line - full opacity
-    if (distance === 1) return 0.25; // Adjacent lines - mờ hơn gấp đôi
-    if (distance === 2) return 0.12; // 2 lines away - mờ hơn gấp đôi
-    return 0.08; // Distant lines - mờ hơn gấp đôi
+    if (distance === 0) return 1;
+    if (distance === 1) return 0.25;
+    if (distance === 2) return 0.12;
+    return 0.08;
   };
 
-  // Navigate to previous line in Focus Mode
+  // Render text in Focus Mode (line by line)
+  const renderFocusModeText = (): React.ReactNode => {
+    if (isLoadingNLP) return <p>Đang tải văn bản...</p>;
+
+    return processedSentences.map((sentence, index) => {
+      const words = processedWords[index] || sentence.split(/(\s+)/);
+      const opacity = getLineOpacity(index);
+
+      return (
+        <div
+          key={index}
+          ref={(el) => { lineRefs.current[index] = el; }}
+          onClick={() => setCurrentLineIndex(index)}
+          className="cursor-pointer transition-opacity duration-500 mb-6"
+          style={{
+            opacity,
+            fontWeight: index === currentLineIndex ? '600' : 'normal',
+          }}
+        >
+          {words.map((segment, wordIndex) => {
+            const trimmedWord = segment.trim();
+            if (!trimmedWord) return <span key={wordIndex}>{segment}</span>;
+
+            const isBold = boldWords.has(trimmedWord);
+
+            return (
+              <span key={wordIndex}>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleWordClick(trimmedWord, e);
+                  }}
+                  className="rounded px-1 transition-colors inline-block hover:bg-[#FFE8CC] hover:bg-opacity-50"
+                  style={{
+                    fontWeight: isBold ? 'bold' : 'normal',
+                  }}
+                >
+                  {highlightMirrorLetters(segment)}
+                </span>
+                {processedWords[index] ? ' ' : ''}
+              </span>
+            );
+          })}
+        </div>
+      );
+    });
+  };
+
   const handlePreviousLine = () => {
     if (isFocusMode) {
       setCurrentLineIndex((prev) => Math.max(0, prev - 1));
     }
   };
 
-  // Navigate to next line in Focus Mode
   const handleNextLine = () => {
     if (isFocusMode) {
-      setCurrentLineIndex((prev) => Math.min(sentences.length - 1, prev + 1));
+      setCurrentLineIndex((prev) => Math.min(processedSentences.length - 1, prev + 1));
     }
   };
 
-  // Handle Play/Pause for TTS
-  const handlePlayPause = (shouldPlay: boolean) => {
-    if (shouldPlay) {
-      // Start playing
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(readingContent);
-        utterance.lang = 'vi-VN';
+  const handlePlayText = async () => {
+    if (isPaused) { resumeSpeaking(); setIsPaused(false); return; }
+    if (isPlaying) { pauseSpeaking(); setIsPaused(true); return; }
 
-        // Try to find a Vietnamese voice
-        const voices = window.speechSynthesis.getVoices();
-        const vietnameseVoice = voices.find(voice =>
-          voice.lang.includes('vi') || voice.lang.includes('VN')
-        );
-
-        if (vietnameseVoice) {
-          utterance.voice = vietnameseVoice;
-        }
-
-        utterance.onend = () => setIsPlaying(false);
-        window.speechSynthesis.speak(utterance);
-        setIsPlaying(true);
-      } else {
-        toast.error("Trình duyệt không hỗ trợ đọc văn bản.");
-      }
-    } else {
-      // Pause/Stop playing
-      window.speechSynthesis.cancel();
-      setIsPlaying(false);
-    }
+    setIsPlaying(true); setIsPaused(false);
+    try { await speakText({ text: readingContent, lang: 'vi-VN', rate: 1.0 }); }
+    catch { toast.error('Không thể phát âm. Vui lòng thử lại.'); }
+    finally { setIsPlaying(false); setIsPaused(false); }
   };
 
-  // Handle Reset
   const handleReset = () => {
-    window.speechSynthesis.cancel();
+    stopSpeaking();
     setIsPlaying(false);
     setCurrentLineIndex(0);
   };
 
   return (
     <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
-      {/* Sidebar */}
       <Sidebar
         activePage="Đọc"
         onNavigate={onNavigate}
@@ -494,10 +476,8 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         onSignOut={onSignOut}
       />
 
-      {/* Main Content */}
       <main className="flex-1 overflow-hidden flex flex-col h-screen">
         <div className="flex-1 flex items-center justify-center px-12 pt-8 pb-4 overflow-hidden">
-          {/* Reading Content Frame */}
           <div
             ref={readingBoxRef}
             className={`w-full max-w-4xl h-full max-h-[calc(100vh-180px)] rounded-[2rem] border-2 shadow-lg p-12 relative ${isFocusMode ? 'focus-mode-active overflow-hidden' : 'overflow-y-auto'
@@ -527,7 +507,6 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
               </div>
             )}
 
-            {/* Focus Mode Gradient Overlays */}
             {isFocusMode && (
               <>
                 <div
@@ -547,7 +526,6 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
           </div>
         </div>
 
-        {/* Toolbar */}
         <div className="pb-6 flex-shrink-0">
           <ReadingToolbar
             onToggleMirror={setIsMirrorEnabled}
@@ -555,16 +533,15 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
             onToggleFocusMode={setIsFocusMode}
             onPreviousLine={handlePreviousLine}
             onNextLine={handleNextLine}
-            onPlayPause={handlePlayPause}
+            onPlayPause={handlePlayText}
             onReset={handleReset}
             isMirrorEnabled={isMirrorEnabled}
             isSyllableMode={isSyllableMode}
-            isPlaying={isPlaying}
+            isPlaying={isPlaying || isPaused}
             isFocusMode={isFocusMode}
           />
         </div>
 
-        {/* Contextual Toolbar */}
         {selectedWord && (
           <ContextualToolbar
             word={selectedWord}
@@ -578,7 +555,6 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         )}
       </main>
 
-      {/* Quick Settings Drawer */}
       <QuickSettingsDrawer
         isCollapsed={!isQuickSettingsOpen}
         onToggle={handleQuickSettingsToggle}

@@ -5,6 +5,7 @@ import { Slider } from './ui/slider';
 import { Input } from './ui/input';
 import { useTheme } from './ThemeContext';
 import { saveSettings } from '../utils/api';
+import { speakText } from '../utils/textToSpeech';
 import { toast } from 'sonner';
 
 interface AudioSettingsPageProps {
@@ -80,25 +81,15 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
     playPreview(voiceId);
   };
 
-  const playPreview = (voiceId?: string) => {
+  const playPreview = async (voiceId?: string) => {
     const voice = voiceId || selectedVoice;
     console.log('Playing preview with voice:', voice, 'Text:', previewText, 'Speed:', readingSpeed);
 
-    // Web Speech API implementation (browser-dependent)
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(previewText);
-      utterance.lang = 'vi-VN';
-      utterance.rate = readingSpeed;
-
-      // Try to find Vietnamese voice
-      const voices = window.speechSynthesis.getVoices();
-      const vietnameseVoice = voices.find(v => v.lang.includes('vi'));
-      if (vietnameseVoice) {
-        utterance.voice = vietnameseVoice;
-      }
-
-      window.speechSynthesis.speak(utterance);
+    try {
+      await speakText({ text: previewText, rate: readingSpeed });
+    } catch (error) {
+      console.error('Preview error:', error);
+      toast.error('Không thể phát âm thanh mẫu');
     }
   };
 

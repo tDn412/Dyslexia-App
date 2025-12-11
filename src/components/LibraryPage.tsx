@@ -4,6 +4,7 @@ import svgPaths from '../imports/svg-5gav2b48w6';
 import { Check, X } from 'lucide-react';
 import { useTheme } from './ThemeContext';
 import { fetchLibrary, addToLibrary } from '../utils/api';
+import { speakText } from '../utils/textToSpeech';
 import { toast } from 'sonner';
 
 interface LibraryPageProps {
@@ -104,24 +105,12 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
   const groupedWords = groupWordsByDate(filteredWords);
 
-  const handlePlayPronunciation = (word: string) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(word);
-      utterance.lang = 'vi-VN';
-
-      // Try to find a Vietnamese voice
-      const voices = window.speechSynthesis.getVoices();
-      const vietnameseVoice = voices.find(voice =>
-        voice.lang.includes('vi') || voice.lang.includes('VN')
-      );
-
-      if (vietnameseVoice) {
-        utterance.voice = vietnameseVoice;
-      }
-
-      window.speechSynthesis.speak(utterance);
-    } else {
-      toast.error("Trình duyệt không hỗ trợ đọc văn bản.");
+  const handlePlayPronunciation = async (word: string) => {
+    try {
+      await speakText({ text: word });
+    } catch (error) {
+      console.error('Play pronunciation error:', error);
+      toast.error('Không thể phát âm từ này');
     }
   };
 

@@ -1,13 +1,15 @@
 import { Sidebar } from './Sidebar';
-import { useState, useEffect, useRef } from 'react';
-import { Upload, Search, Filter, Edit2, Trash2, Check, X } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Upload, Search, Filter, Edit2, Trash2, Check, X, BookOpen, Mic } from 'lucide-react';
 import { Input } from './ui/input';
-import { useTheme } from './ThemeContext';
-import { uploadOCR, fetchOCRFiles } from '../utils/api';
+import { api } from '../utils/api';
 import { toast } from 'sonner';
+import { supabase } from '../supabaseClient';
+import { OCRPreviewModal } from './OCRPreviewModal';
+import { useTheme } from './ThemeContext';
 
 interface OCRImportPageProps {
-  onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport' | 'Exercise' | 'QuizPlayer') => void;
+  onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport' | 'Exercise') => void;
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onSignOut?: () => void;
@@ -29,30 +31,62 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [editedFileName, setEditedFileName] = useState('');
   const popupRef = useRef<HTMLDivElement>(null);
-  const [readingFiles, setReadingFiles] = useState<ReadingFile[]>([]);
-  const [loading, setLoading] = useState(true);
 
+  // OCR Preview states
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewFilename, setPreviewFilename] = useState('');
+  const [previewContent, setPreviewContent] = useState('');
+
+  // Reading files from OCRImport table
+  const [readingFiles, setReadingFiles] = useState<ReadingFile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load OCR files from Supabase on mount
   useEffect(() => {
-    const loadFiles = async () => {
-      setLoading(true);
+    const loadOCRFiles = async () => {
       try {
-        // userId is now from props
-        const data = await fetchOCRFiles(userId);
-        const mappedFiles = data.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          dateAdded: new Date(item.created_at).toISOString().split('T')[0]
-        }));
-        setReadingFiles(mappedFiles);
+        setIsLoading(true);
+        // Use userId from props or fallback
+        const currentUserId = userId;
+        const { data, error } = await supabase
+          .from('ocr_imports')
+          .select('ocr_id, file_name, created_at')
+          .eq('user_id', currentUserId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error loading OCR files:', error);
+          toast.error('Không thể tải danh sách file OCR');
+          return;
+        }
+
+        if (data) {
+          const files = data.map(item => ({
+            id: item.ocr_id,
+            name: item.file_name,
+            dateAdded: new Date(item.created_at).toISOString().split('T')[0],
+          }));
+          setReadingFiles(files);
+        }
       } catch (error) {
-        console.error("Failed to load OCR files", error);
-        toast.error("Lỗi khi tải danh sách tệp.");
+        console.error('Error:', error);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
-    loadFiles();
-  }, []);
+
+    loadOCRFiles();
+  }, [userId]);
+
+  // Filter files based on search query
+  const filteredReadings = useMemo(() => {
+    if (!searchQuery.trim()) return readingFiles;
+
+    const query = searchQuery.toLowerCase();
+    return readingFiles.filter(file =>
+      file.name.toLowerCase().includes(query)
+    );
+  }, [readingFiles, searchQuery]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -62,11 +96,6 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
   };
@@ -85,40 +114,143 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
     }
   };
 
+
   const handleConfirm = async () => {
     if (uploadedFile) {
       try {
-        // userId is now from props
-        const reader = new FileReader();
-        reader.readAsDataURL(uploadedFile);
-        reader.onload = async () => {
-          const base64Data = reader.result as string;
-          // Remove data URL prefix (e.g., "data:image/png;base64,")
-          const fileData = base64Data.split(',')[1];
+        toast.info('Đang xử lý OCR...');
+        const response = await api.ocr.upload(uploadedFile);
 
-          await uploadOCR(userId, uploadedFile.name, fileData, uploadedFile.type);
-          toast.success("Tải lên và xử lý tệp thành công!");
-          setUploadedFile(null);
+        console.log('OCR Full Response:', response); // Debug log
 
-          // Refresh list
-          const data = await fetchOCRFiles(userId);
-          const mappedFiles = data.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            dateAdded: new Date(item.created_at).toISOString().split('T')[0]
-          }));
-          setReadingFiles(mappedFiles);
-        };
-        reader.onerror = (error) => {
-          console.error("File reading error", error);
-          toast.error("Lỗi khi đọc tệp.");
-        };
+        if (response.error) {
+          toast.error('Lỗi OCR: ' + response.error);
+          return;
+        }
+
+        // Check if we got text back
+        if (!response.data?.text) {
+          console.error('No text in response:', response.data); // Debug log
+          toast.error('Không trích xuất được văn bản từ ảnh');
+          return;
+        }
+
+        const extractedText = response.data.text;
+        console.log('Extracted text:', extractedText);
+        console.log('Text length:', extractedText.length); // Debug log
+
+        // Show preview modal instead of saving directly
+        setPreviewFilename(uploadedFile.name.replace(/\.[^/.]+$/, ''));
+        setPreviewContent(extractedText);
+        console.log('Setting preview content:', extractedText); // Debug log
+        setShowPreview(true);
+        setUploadedFile(null); // Clear uploaded file
+
       } catch (error) {
-        console.error("Upload failed", error);
-        toast.error("Lỗi khi tải lên tệp.");
+        console.error('OCR Error:', error);
+        toast.error('Không thể xử lý tệp. Vui lòng thử lại.');
       }
     }
   };
+
+  // Handle save from preview modal
+  const handleSaveFromPreview = async (editedFilename: string, editedContent: string) => {
+    try {
+      const currentUserId = userId;
+      // Save to Supabase OCRImport table
+      const { data: savedOCR, error: saveError } = await supabase
+        .from('ocr_imports')
+        .insert({
+          user_id: currentUserId,
+          file_name: editedFilename,
+          content: editedContent,
+        })
+        .select()
+        .single();
+
+      if (saveError) {
+        console.error('Error saving to database:', saveError);
+        toast.error('Lỗi khi lưu văn bản: ' + saveError.message);
+        return;
+      }
+
+      // Add the file to the reading list
+      const newReading: ReadingFile = {
+        id: savedOCR.ocrid,
+        name: editedFilename,
+        dateAdded: new Date().toISOString().split('T')[0],
+      };
+
+      setReadingFiles([newReading, ...readingFiles]);
+      setShowPreview(false);
+      toast.success(`Đã lưu văn bản thành công! (${editedContent.length} ký tự)`);
+
+    } catch (error) {
+      console.error('Save Error:', error);
+      toast.error('Không thể lưu tệp. Vui lòng thử lại.');
+    }
+  };
+
+  const handleCancelPreview = () => {
+    setShowPreview(false);
+    setPreviewFilename('');
+    setPreviewContent('');
+  };
+
+  // Add to Reading tab
+  const handleAddToReading = async (fileId: string) => {
+    try {
+      const file = readingFiles.find(f => f.id === fileId);
+      if (!file) return;
+
+      // Get content from OCRImport table
+      const { data: ocrData, error: fetchError } = await supabase
+        .from('ocr_imports')
+        .select('content, file_name')
+        .eq('ocr_id', fileId)
+        .single();
+
+      if (fetchError || !ocrData) {
+        toast.error('Không thể tải nội dung file OCR');
+        return;
+      }
+
+      // Save to Text table for both Reading and Speaking
+      const timestamp = Date.now();
+      const { error: saveError } = await supabase
+        .from('Text')
+        .insert([
+          {
+            textid: 't_doc_' + timestamp,
+            title: ocrData.file_name,
+            content: ocrData.content,
+            level: 'A1',
+            topic: 'Đọc',
+          },
+          {
+            textid: 't_noi_' + timestamp,
+            title: ocrData.file_name,
+            content: ocrData.content,
+            level: 'A1',
+            topic: 'Nói',
+          }
+        ]);
+
+      if (saveError) {
+        console.error('Error saving to Text:', saveError);
+        toast.error('Lỗi khi thêm bài: ' + saveError.message);
+        return;
+      }
+
+      toast.success('✅ Đã thêm vào Đọc & Nói!', {
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Add to Reading error:', error);
+      toast.error('Không thể thêm bài');
+    }
+  };
+
 
   const handleDelete = () => {
     setUploadedFile(null);
@@ -154,10 +286,6 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
     setReadingFiles(readingFiles.filter(file => file.id !== id));
   };
 
-  const filteredReadings = readingFiles.filter(file =>
-    (file.name || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   // Close popup when clicking outside or pressing Escape
   useEffect(() => {
     if (isEditPopupOpen) {
@@ -182,6 +310,11 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
       };
     }
   }, [isEditPopupOpen]);
+
+  // Import custom Theme Context
+  // const { useTheme } = require('./ThemeContext');
+  // Wait, imports are at top. In App-1 original it was: import { useTheme } from './ThemeContext';
+  // Let's rely on top imports.
 
   return (
     <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
@@ -212,39 +345,36 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
                 <label
                   htmlFor="file-upload"
                   onDragOver={handleDragOver}
-                  onDragEnter={handleDragEnter}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                   className={`flex items-center justify-center h-full min-h-[200px] cursor-pointer border-2 border-dashed rounded-xl p-8 transition-all`}
                   style={{
                     backgroundColor: isDragging ? '#F0F8FF' : themeColors.cardBackground,
-                    borderColor: isDragging ? '#B8D4E8' : themeColors.border,
+                    borderColor: isDragging ? '#B8D4E8' : (isDragging ? themeColors.border : themeColors.border), // Simplified logic
                   }}
                 >
                   <div className="flex flex-col items-center justify-center gap-4">
-                    <div
-                      className="w-16 h-16 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: themeColors.accentMain }}
-                    >
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: themeColors.accentMain }}>
                       <Upload className="w-8 h-8" style={{ color: themeColors.textMain }} />
                     </div>
                     <div className="text-center">
                       <p
-                        className="text-[#111111] mb-2"
+                        className="mb-2"
                         style={{
                           fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                           fontSize: '26px',
                           letterSpacing: '0.12em',
+                          color: themeColors.textMain,
                         }}
                       >
                         {uploadedFile ? uploadedFile.name : 'Kéo thả hoặc chọn tệp để thêm bài đọc'}
                       </p>
                       <p
-                        className="text-[#888888]"
                         style={{
                           fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                           fontSize: '24px',
                           letterSpacing: '0.12em',
+                          color: themeColors.textMuted,
                         }}
                       >
                         Hỗ trợ: .jpg, .png, .docx
@@ -321,20 +451,19 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
           {/* Reading Files List */}
           <div className="space-y-4">
             <h2
-              className="text-[#111111] mb-6"
+              className="mb-6"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                 fontSize: '30px',
                 letterSpacing: '0.12em',
+                color: themeColors.textMain,
               }}
             >
               Danh sách bài đọc ({filteredReadings.length})
             </h2>
 
             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-              {loading ? (
-                <div className="text-center py-12">Loading...</div>
-              ) : filteredReadings.map((file) => (
+              {filteredReadings.map((file) => (
                 <div
                   key={file.id}
                   className="rounded-xl border-2 p-6 shadow-sm hover:shadow-md transition-all"
@@ -343,65 +472,79 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
                     borderColor: themeColors.border,
                   }}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p
-                        className="mb-2"
-                        style={{
-                          fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                          fontSize: '26px',
-                          letterSpacing: '0.12em',
-                          color: themeColors.textMain,
-                        }}
-                      >
-                        <span style={{ color: themeColors.textMuted }}>Tên:</span> {file.name}
-                      </p>
-                      <p
-                        style={{
-                          fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                          fontSize: '24px',
-                          letterSpacing: '0.12em',
-                          color: themeColors.textMuted,
-                        }}
-                      >
-                        Ngày tạo: {file.dateAdded}
-                      </p>
-                    </div>
+                  {/* File Info */}
+                  <div className="mb-4">
+                    <p
+                      className="mb-2"
+                      style={{
+                        fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                        fontSize: '26px',
+                        letterSpacing: '0.12em',
+                        color: themeColors.textMain,
+                      }}
+                    >
+                      <span style={{ color: themeColors.textMuted }}>Tên:</span> {file.name}
+                    </p>
+                    <p
+                      style={{
+                        fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                        fontSize: '24px',
+                        letterSpacing: '0.12em',
+                        color: themeColors.textMuted,
+                      }}
+                    >
+                      Ngày tạo: {file.dateAdded}
+                    </p>
+                  </div>
 
-                    <div className="flex gap-3 ml-4">
-                      <button
-                        onClick={() => handleEditReading(file.id)}
-                        className="px-6 py-3 border-2 rounded-xl transition-all flex items-center gap-2"
-                        style={{
-                          fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                          fontSize: '24px',
-                          backgroundColor: themeColors.accentMain,
-                          borderColor: themeColors.accentHover,
-                          color: themeColors.textMain,
-                        }}
-                      >
-                        <Edit2 className="w-5 h-5" />
-                        <span>Sửa</span>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteReading(file.id)}
-                        className="px-6 py-3 bg-[#FFE8E8] border-2 border-[#FFCCCC] rounded-xl hover:bg-[#FFD8D8] transition-all flex items-center gap-2"
-                        style={{
-                          fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                          fontSize: '24px',
-                          color: themeColors.textMain,
-                        }}
-                      >
-                        <Trash2 className="w-5 h-5" />
-                        <span>Xóa</span>
-                      </button>
-                    </div>
+                  {/* Action Buttons */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      onClick={() => handleEditReading(file.id)}
+                      className="px-4 py-3 border-2 rounded-xl transition-all flex items-center justify-center gap-2"
+                      style={{
+                        fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                        fontSize: '22px',
+                        backgroundColor: themeColors.accentMain,
+                        borderColor: themeColors.accentHover,
+                        color: themeColors.textMain,
+                      }}
+                    >
+                      <Edit2 className="w-5 h-5" />
+                      <span>Sửa</span>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteReading(file.id)}
+                      className="px-4 py-3 bg-[#FFE8E8] border-2 border-[#FFCCCC] rounded-xl hover:bg-[#FFD8D8] transition-all flex items-center justify-center gap-2"
+                      style={{
+                        fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                        fontSize: '22px',
+                        color: themeColors.textMain,
+                      }}
+                    >
+                      <Trash2 className="w-5 h-5" />
+                      <span>Xóa</span>
+                    </button>
+                    <button
+                      onClick={() => handleAddToReading(file.id)}
+                      className="px-4 py-3 border-2 rounded-xl transition-all flex items-center justify-center gap-2"
+                      style={{
+                        fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                        fontSize: '22px',
+                        backgroundColor: '#D4E7F5',
+                        borderColor: '#B8D4E8',
+                        color: themeColors.textMain,
+                      }}
+                    >
+                      <BookOpen className="w-5 h-5" />
+                      <span>Thêm bài</span>
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
 
-            {!loading && filteredReadings.length === 0 && (
+            {filteredReadings.length === 0 && (
               <div className="text-center py-12">
                 <p
                   className="text-[#888888]"
@@ -515,6 +658,15 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
             </div>
           </div>
         )}
+
+        {/* OCR Preview Modal */}
+        <OCRPreviewModal
+          isOpen={showPreview}
+          filename={previewFilename}
+          extractedText={previewContent}
+          onCancel={handleCancelPreview}
+          onSave={handleSaveFromPreview}
+        />
       </main>
     </div>
   );
