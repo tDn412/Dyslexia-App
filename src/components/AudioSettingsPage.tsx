@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { ArrowLeft, Save, Volume2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Slider } from './ui/slider';
 import { Input } from './ui/input';
-import { speakText, getVoices, isSpeechSynthesisSupported } from '../utils/textToSpeech';
+import { useTheme } from './ThemeContext';
+import { useSettings } from '../contexts/SettingsContext';
+import { speakText } from '../utils/textToSpeech';
 import { toast } from 'sonner';
-import { supabase } from '../lib/supabaseClient';
 
 interface AudioSettingsPageProps {
-  onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
+  onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport' | 'Exercise' | 'QuizPlayer') => void;
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onSignOut?: () => void;
@@ -27,73 +28,20 @@ const femaleVoices = [
 ];
 
 export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onToggleCollapse, onSignOut }: AudioSettingsPageProps) {
-  const [selectedVoice, setSelectedVoice] = useState('male-1');
-  const [readingSpeed, setReadingSpeed] = useState(1.0);
-  const [voicesReady, setVoicesReady] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const { themeColors } = useTheme();
+  const { settings, updateSettings, isLoading } = useSettings();
+
+  const [selectedVoice, setSelectedVoice] = useState(settings.readingVoice);
+  const [readingSpeed, setReadingSpeed] = useState(settings.readingSpeed);
   const previewText = "Nội dung nghe thử";
 
-  // Load settings on mount
+  // Sync settings when loaded
   useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        // Get userId from Supabase session
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) {
-          setIsLoading(false);
-          return;
-        }
-
-        const userId = session.user.id;
-
-        const { data, error } = await supabase
-          .from('UserSetting')
-          .select('*')
-          .eq('userid', userId)
-          .maybeSingle(); // Use maybeSingle to avoid error when no row exists
-
-        if (error) {
-          console.error('Supabase error:', error);
-        } else if (data) {
-          setSelectedVoice(data.readingvoice || 'male-1');
-          setReadingSpeed(data.readingspeed || 1.0);
-        }
-      } catch (error) {
-        console.error('Error loading settings:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadSettings();
-  }, []);
-
-  // Wait for voices to load
-  useEffect(() => {
-    if (!isSpeechSynthesisSupported()) {
-      console.warn('Speech synthesis is not supported');
-      return;
+    if (!isLoading) {
+      setSelectedVoice(settings.readingVoice);
+      setReadingSpeed(settings.readingSpeed);
     }
-
-    const checkVoices = () => {
-      const voices = getVoices();
-      if (voices.length > 0) {
-        setVoicesReady(true);
-      } else {
-        // Try again after a short delay
-        setTimeout(checkVoices, 100);
-      }
-    };
-
-    checkVoices();
-
-    // Listen for voices changed event
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        setVoicesReady(true);
-      };
-    }
-  }, []);
+  }, [settings, isLoading]);
 
   const handleBack = () => {
     if (onNavigate) {
@@ -103,32 +51,17 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
 
   const handleSave = async () => {
     try {
-      const userId = localStorage.getItem('userId');
-      if (!userId) {
-        toast.error('Vui lòng đăng nhập lại');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('UserSetting')
-        .upsert({
-          userid: userId,
-          readingvoice: selectedVoice,
-          readingspeed: readingSpeed,
-        });
-
-      if (error) {
-        toast.error('Không thể lưu cài đặt. Vui lòng thử lại.');
-        console.error('Supabase error:', error);
-      } else {
-        toast.success('Đã lưu cài đặt thành công!');
-        if (onNavigate) {
-          onNavigate('SettingsOverview');
-        }
-      }
+      await updateSettings({
+        readingVoice: selectedVoice,
+        readingSpeed: readingSpeed,
+      });
+      // Context will show toast
     } catch (error) {
-      console.error('Error saving settings:', error);
-      toast.error('Không thể lưu cài đặt. Vui lòng thử lại.');
+      // Error handled by context or can be logged
+    }
+
+    if (onNavigate) {
+      onNavigate('SettingsOverview');
     }
   };
 
@@ -138,32 +71,19 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
   };
 
   const playPreview = async (voiceId?: string) => {
-    if (!isSpeechSynthesisSupported()) {
-      toast.error('Trình duyệt của bạn không hỗ trợ phát âm.');
-      return;
-    }
-
-    if (!voicesReady) {
-      toast.info('Đang tải giọng nói... Vui lòng thử lại sau.');
-      return;
-    }
+    const voice = voiceId || selectedVoice;
+    console.log('Playing preview with voice:', voice, 'Text:', previewText, 'Speed:', readingSpeed);
 
     try {
-      await speakText({
-        text: previewText,
-        lang: 'vi-VN',
-        rate: readingSpeed,
-        pitch: 1.0,
-        volume: 1.0,
-      });
+      await speakText({ text: previewText, rate: readingSpeed }); // voice param if supported by API
     } catch (error) {
-      console.error('Error playing preview:', error);
-      toast.error('Không thể phát âm. Vui lòng thử lại.');
+      console.error('Preview error:', error);
+      toast.error('Không thể phát âm thanh mẫu');
     }
   };
 
   return (
-    <div className="flex h-screen bg-[#FFF8E7]">
+    <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
       {/* Sidebar */}
       <Sidebar activePage="Cài đặt" onNavigate={onNavigate} isCollapsed={isSidebarCollapsed} onToggleCollapse={onToggleCollapse} onSignOut={onSignOut} />
 
@@ -171,56 +91,92 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
       <main className="flex-1 overflow-hidden flex flex-col">
         <div className="flex-1 flex flex-col max-w-5xl mx-auto w-full px-12 py-10">
           {/* Header with Back Button */}
-          <div className="flex items-center gap-4 mb-8">
+          <div className="flex items-start gap-6 mb-6 flex-shrink-0">
+            {/* Back Button */}
             <button
               onClick={handleBack}
-              className="w-12 h-12 rounded-xl bg-[#FFF8E7] border-2 border-[#E0DCCC] flex items-center justify-center hover:bg-[#FFF4E0] transition-all flex-shrink-0"
+              className="w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all flex-shrink-0"
+              style={{
+                backgroundColor: themeColors.cardBackground,
+                borderColor: themeColors.border,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = themeColors.accentMain;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = themeColors.cardBackground;
+              }}
               aria-label="Back to Settings"
             >
-              <ArrowLeft className="w-6 h-6 text-[#111111]" />
+              <ArrowLeft className="w-6 h-6" style={{ color: themeColors.textMain }} />
             </button>
             <h1
-              className="text-[#111111]"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                fontSize: '38px',
+                letterSpacing: '0.05em',
+                color: themeColors.textMain,
               }}
             >
-              Cài đặt Âm thanh & Giọng nói
+              Cài Đặt Âm Thanh
             </h1>
           </div>
 
           {/* Main Settings Panel */}
-          <div className="bg-[#FFFCF2] rounded-2xl border-2 border-[#E0DCCC] shadow-lg p-8 flex-1 flex flex-col overflow-hidden">
+          <div
+            className="rounded-2xl border-2 shadow-lg p-8 flex-1 flex flex-col overflow-hidden"
+            style={{
+              backgroundColor: themeColors.cardBackground,
+              borderColor: themeColors.border,
+            }}
+          >
             {/* Listening Preview Section */}
             <div className="mb-6 flex-shrink-0">
               <label
-                className="block text-[#111111] mb-3"
+                className="block mb-3"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                   fontSize: '20px',
                   letterSpacing: '0.02em',
+                  color: themeColors.textMain,
                 }}
               >
                 Nghe thử
               </label>
-              <div className="bg-[#FFF4E0] rounded-2xl border-2 border-[#E8DCC8] p-5 flex items-center justify-between">
+              <div
+                className="rounded-2xl border-2 p-5 flex items-center justify-between"
+                style={{
+                  backgroundColor: themeColors.accentMain,
+                  borderColor: themeColors.border,
+                }}
+              >
                 <p
-                  className="text-[#111111]"
                   style={{
                     fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                     fontSize: '20px',
                     letterSpacing: '0.14em',
                     lineHeight: '1.8',
+                    color: themeColors.textMain,
                   }}
                 >
                   {previewText}
                 </p>
                 <button
                   onClick={() => playPreview()}
-                  className="ml-6 w-11 h-11 rounded-xl bg-[#D4E7F5] hover:bg-[#C5DCF0] border-2 border-[#B8D4E8] flex items-center justify-center transition-all shadow-sm hover:shadow-md flex-shrink-0"
+                  className="ml-6 w-11 h-11 rounded-xl border-2 flex items-center justify-center transition-all shadow-sm hover:shadow-md flex-shrink-0"
+                  style={{
+                    backgroundColor: '#D4E7F5',
+                    borderColor: '#B8D4E8',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#C5DCF0';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#D4E7F5';
+                  }}
                   aria-label="Play preview"
                 >
-                  <Volume2 className="w-5 h-5 text-[#111111]" />
+                  <Volume2 className="w-5 h-5" style={{ color: themeColors.textMain }} />
                 </button>
               </div>
             </div>
@@ -229,11 +185,12 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
             <div className="mb-6 flex-shrink-0">
               <div className="flex items-center gap-6">
                 <label
-                  className="text-[#111111] w-48 flex-shrink-0"
+                  className="w-48 flex-shrink-0"
                   style={{
                     fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                     fontSize: '20px',
                     letterSpacing: '0.02em',
+                    color: themeColors.textMain,
                   }}
                 >
                   Tốc độ đọc
@@ -241,7 +198,7 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
                 <div className="w-80">
                   <Slider
                     value={[readingSpeed * 10]}
-                    onValueChange={(value) => setReadingSpeed(value[0] / 10)}
+                    onValueChange={(value: number[]) => setReadingSpeed(value[0] / 10)}
                     min={5}
                     max={20}
                     step={0.5}
@@ -255,10 +212,13 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
                   min={0.5}
                   max={2.0}
                   step={0.05}
-                  className="w-20 text-center bg-[#FFF8E7] border-2 border-[#E0DCCC] rounded-xl h-11"
+                  className="w-20 text-center border-2 rounded-xl h-11"
                   style={{
                     fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                     fontSize: '18px',
+                    backgroundColor: themeColors.cardBackground,
+                    borderColor: themeColors.border,
+                    color: themeColors.textMain,
                   }}
                 />
               </div>
@@ -267,11 +227,12 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
             {/* Male Voices Section */}
             <div className="mb-6 flex-shrink-0">
               <label
-                className="block text-[#111111] mb-3"
+                className="block mb-3"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                   fontSize: '20px',
                   letterSpacing: '0.02em',
+                  color: themeColors.textMain,
                 }}
               >
                 Nam (Male)
@@ -281,14 +242,24 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
                   <button
                     key={voice.id}
                     onClick={() => handleVoiceSelect(voice.id)}
-                    className={`flex-1 px-5 py-4 rounded-2xl border-2 transition-all shadow-sm ${selectedVoice === voice.id
-                      ? 'bg-[#D4E7F5] border-[#B8D4E8] shadow-md ring-2 ring-[#B8D4E8] ring-offset-2 ring-offset-[#FFFCF2]'
-                      : 'bg-[#FFF8E7] border-[#E0DCCC] hover:bg-[#FFF4E0] hover:shadow-md'
-                      }`}
+                    className="flex-1 px-5 py-4 rounded-2xl border-2 transition-all shadow-sm"
                     style={{
                       fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                       fontSize: '18px',
                       letterSpacing: '0.02em',
+                      backgroundColor: selectedVoice === voice.id ? '#D4E7F5' : themeColors.cardBackground,
+                      borderColor: selectedVoice === voice.id ? '#B8D4E8' : themeColors.border,
+                      color: themeColors.textMain,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedVoice !== voice.id) {
+                        e.currentTarget.style.backgroundColor = themeColors.accentMain;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedVoice !== voice.id) {
+                        e.currentTarget.style.backgroundColor = themeColors.cardBackground;
+                      }
                     }}
                   >
                     {voice.label}
@@ -300,11 +271,12 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
             {/* Female Voices Section */}
             <div className="mb-6 flex-shrink-0">
               <label
-                className="block text-[#111111] mb-3"
+                className="block mb-3"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                   fontSize: '20px',
                   letterSpacing: '0.02em',
+                  color: themeColors.textMain,
                 }}
               >
                 Nữ (Female)
@@ -314,14 +286,24 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
                   <button
                     key={voice.id}
                     onClick={() => handleVoiceSelect(voice.id)}
-                    className={`flex-1 px-5 py-4 rounded-2xl border-2 transition-all shadow-sm ${selectedVoice === voice.id
-                      ? 'bg-[#D4E7F5] border-[#B8D4E8] shadow-md ring-2 ring-[#B8D4E8] ring-offset-2 ring-offset-[#FFFCF2]'
-                      : 'bg-[#FFF8E7] border-[#E0DCCC] hover:bg-[#FFF4E0] hover:shadow-md'
-                      }`}
+                    className="flex-1 px-5 py-4 rounded-2xl border-2 transition-all shadow-sm"
                     style={{
                       fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                       fontSize: '18px',
                       letterSpacing: '0.02em',
+                      backgroundColor: selectedVoice === voice.id ? '#D4E7F5' : themeColors.cardBackground,
+                      borderColor: selectedVoice === voice.id ? '#B8D4E8' : themeColors.border,
+                      color: themeColors.textMain,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedVoice !== voice.id) {
+                        e.currentTarget.style.backgroundColor = themeColors.accentMain;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedVoice !== voice.id) {
+                        e.currentTarget.style.backgroundColor = themeColors.cardBackground;
+                      }
                     }}
                   >
                     {voice.label}
@@ -334,11 +316,20 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
             <div className="flex justify-center mt-auto pt-4 flex-shrink-0">
               <button
                 onClick={handleSave}
-                className="bg-[#D4E7F5] hover:bg-[#C5DCF0] text-[#111111] px-12 py-3.5 rounded-2xl border-2 border-[#B8D4E8] shadow-md hover:shadow-lg transition-all flex items-center gap-3"
+                className="px-12 py-3.5 rounded-2xl border-2 shadow-md hover:shadow-lg transition-all flex items-center gap-3"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                   fontSize: '20px',
                   letterSpacing: '0.02em',
+                  backgroundColor: '#D4E7F5',
+                  borderColor: '#B8D4E8',
+                  color: themeColors.textMain,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#C5DCF0';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#D4E7F5';
                 }}
               >
                 <Save className="w-5 h-5" />

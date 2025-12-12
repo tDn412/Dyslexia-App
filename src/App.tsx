@@ -12,11 +12,24 @@ import { SettingsOverviewPage } from './components/SettingsOverviewPage';
 import { DisplaySettingsPage } from './components/DisplaySettingsPage';
 import { AudioSettingsPage } from './components/AudioSettingsPage';
 import { OCRImportPage } from './components/OCRImportPage';
-import { SettingsProvider } from './contexts/SettingsContext';
+import { ThemeProvider, useTheme } from './components/ThemeContext';
+import { SettingsProvider, useSettings } from './contexts/SettingsContext';
 import svgPaths from './imports/svg-jkvvruu31p';
 import { supabase } from './lib/supabaseClient';
 
 export default function App() {
+  return (
+    <SettingsProvider>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </SettingsProvider>
+  );
+}
+
+function AppContent() {
+  const { themeColors, setTheme } = useTheme();
+  const { settings } = useSettings();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [showRegister, setShowRegister] = useState(false);
@@ -24,6 +37,13 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedReadingId, setSelectedReadingId] = useState<string | null>(null);
   const [selectedSpeakingId, setSelectedSpeakingId] = useState<string | null>(null);
+
+  // Sync theme from persistent settings
+  useEffect(() => {
+    if (settings.colorTheme) {
+      setTheme(settings.colorTheme as any);
+    }
+  }, [settings.colorTheme, setTheme]);
 
   // Check for existing Supabase Auth session on mount
   useEffect(() => {
@@ -196,7 +216,7 @@ export default function App() {
   ];
 
   return (
-    <div className="flex h-screen bg-[#FFF8E7]">
+    <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
       {/* Sidebar */}
       <Sidebar
         activePage={getActivePage()}

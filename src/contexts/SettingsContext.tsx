@@ -9,6 +9,7 @@ interface Settings {
     colorTheme: string;
     readingVoice: string;
     readingSpeed: number;
+    lineSpacing: number;
 }
 
 interface SettingsContextType {
@@ -25,6 +26,7 @@ const defaultSettings: Settings = {
     colorTheme: 'light',
     readingVoice: 'vi-VN-Standard-A',
     readingSpeed: 1.0,
+    lineSpacing: 1.5,
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -57,6 +59,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                     colorTheme: data.colortheme || defaultSettings.colorTheme,
                     readingVoice: data.readingvoice || defaultSettings.readingVoice,
                     readingSpeed: data.readingspeed || defaultSettings.readingSpeed,
+                    lineSpacing: data.linespacing || defaultSettings.lineSpacing,
                 });
             }
         } catch (error) {
@@ -82,6 +85,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                 colortheme: updatedSettings.colorTheme,
                 readingvoice: updatedSettings.readingVoice,
                 readingspeed: updatedSettings.readingSpeed,
+                linespacing: updatedSettings.lineSpacing,
             };
 
             // Upsert (insert or update)
@@ -111,19 +115,20 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         const applyStyles = () => {
             const root = document.documentElement;
 
-            // Apply CSS variables
+            // Apply CSS variables for Fonts (ThemeContext handles Colors)
             root.style.setProperty('--font-family', settings.fontFamily === 'OpenDyslexic'
                 ? "'OpenDyslexic', 'Lexend', sans-serif"
                 : "'Lexend', sans-serif");
-            root.style.setProperty('--font-size', `${settings.fontSize}px`);
-            root.style.setProperty('--letter-spacing', `${settings.letterSpacing}em`);
+            // Also set --display-font-family for compatibility with teammate's UI usage if needed
+            root.style.setProperty('--display-font-family', settings.fontFamily);
 
-            // Apply theme
-            if (settings.colorTheme === 'dark') {
-                root.classList.add('dark');
-            } else {
-                root.classList.remove('dark');
-            }
+            root.style.setProperty('--font-size', `${settings.fontSize}px`);
+            root.style.setProperty('--display-font-size', `${settings.fontSize}px`);
+
+            root.style.setProperty('--letter-spacing', `${settings.letterSpacing}em`);
+            root.style.setProperty('--display-letter-spacing', `${settings.letterSpacing}em`);
+
+            root.style.setProperty('--display-line-spacing', settings.lineSpacing.toString());
         };
 
         applyStyles();

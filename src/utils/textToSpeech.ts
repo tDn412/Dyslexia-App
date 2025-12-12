@@ -1,4 +1,4 @@
-import { api } from './api';
+import { aiApi as api } from './aiService';
 import { toast } from 'sonner';
 
 /**
@@ -42,6 +42,11 @@ export const speakText = async (options: SpeakOptions): Promise<void> => {
     // Decode base64 and play
     const audioSrc = `data:audio/mp3;base64,${response.data.audio_base64}`;
     const audio = new Audio(audioSrc);
+
+    // Apply playback speed
+    if (options.rate) {
+      audio.playbackRate = options.rate;
+    }
 
     currentAudio = audio;
 
@@ -158,4 +163,3 @@ export const getVoices = (): SpeechSynthesisVoice[] => {
 export const isSpeechSynthesisSupported = (): boolean => {
   return true;
 };
-
