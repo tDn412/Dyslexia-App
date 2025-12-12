@@ -42,14 +42,16 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     const loadWords = async () => {
       setIsLoadingWords(true);
 
-      // Get userId from localStorage
-      const userId = localStorage.getItem('userId');
-      if (!userId) {
-        setIsLoadingWords(false);
-        return;
-      }
-
       try {
+        // Get userId from Supabase session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          setIsLoadingWords(false);
+          return;
+        }
+
+        const userId = session.user.id;
+
         const { data, error } = await supabase
           .from('LibraryWord')
           .select('*')
@@ -72,7 +74,8 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
           }));
 
           setWords(loadedWords);
-          localStorage.setItem('words', JSON.stringify(loadedWords));
+        } else {
+          setWords([]);
         }
 
       } catch (error) {
@@ -164,21 +167,19 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     console.log('Adding word:', trimmedWord); // Debug
 
     try {
-      // Get userId from localStorage
-      const userId = localStorage.getItem('userId');
-      if (!userId) {
+      // Get userId from Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
         toast.error('Vui lòng đăng nhập lại');
         return;
       }
 
-      // Generate unique wordid (VARCHAR type)
-      const wordid = 'w' + Date.now();
+      const userId = session.user.id; // UUID from auth
 
-      // Insert directly to Supabase
+      // Insert to Supabase (wordid auto-generated as UUID)
       const { data, error } = await supabase
         .from('LibraryWord')
         .insert({
-          wordid: wordid,
           userid: userId,
           word: trimmedWord,
         })

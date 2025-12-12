@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import svgPaths from '../imports/svg-3zpfms6l7d';
+import { supabase } from '../lib/supabaseClient';
+import { toast } from 'sonner';
 
 interface RegisterPageProps {
   onRegister: () => void;
@@ -14,28 +16,64 @@ export function RegisterPage({ onRegister, onCancel }: RegisterPageProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [birthDate, setBirthDate] = useState('');
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     // Validation
     if (!fullName.trim() || !username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim() || !birthDate) {
-      alert('Vui lòng điền đầy đủ thông tin');
+      toast.error('Vui lòng điền đầy đủ thông tin');
       return;
     }
 
     if (password !== confirmPassword) {
-      alert('Mật khẩu không khớp');
+      toast.error('Mật khẩu không khớp');
       return;
     }
 
     // Simple email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      alert('Email không hợp lệ');
+      toast.error('Email không hợp lệ');
       return;
     }
 
-    // In real app, this would connect to registration service
-    console.log('Registering user:', { fullName, username, email, birthDate });
-    onRegister();
+    if (password.length < 6) {
+      toast.error('Mật khẩu phải có ít nhất 6 ký tự');
+      return;
+    }
+
+    try {
+      // Register with Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            username: username.trim(),
+            birth_date: birthDate
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Registration error:', error);
+        if (error.message.includes('already registered')) {
+          toast.error('Email đã được đăng ký');
+        } else {
+          toast.error('Lỗi khi đăng ký: ' + error.message);
+        }
+        return;
+      }
+
+      if (data.user) {
+        toast.success('Đăng ký thành công! Vui lòng đăng nhập.');
+        onRegister();
+      } else {
+        toast.error('Không thể tạo tài khoản');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast.error('Lỗi khi đăng ký. Vui lòng thử lại.');
+    }
   };
 
   return (
@@ -66,11 +104,11 @@ export function RegisterPage({ onRegister, onCancel }: RegisterPageProps) {
             {/* Form Container */}
             <div className="bg-[#fffcf2] box-border pb-[48px] pt-[48px] px-[48px] rounded-[40.5px] w-[1000px] relative">
               <div aria-hidden="true" className="absolute border-2 border-[#e8dcc8] border-solid inset-0 pointer-events-none rounded-[40.5px] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)]" />
-              
+
               {/* Two Column Grid */}
               <div className="grid grid-cols-2 gap-x-10 gap-y-7 relative">
                 {/* Left Column */}
-                
+
                 {/* Full Name Field */}
                 <div className="content-stretch flex flex-col gap-[18px] items-start">
                   <div className="h-[42px] relative shrink-0 w-full">

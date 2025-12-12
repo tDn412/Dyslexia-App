@@ -60,17 +60,20 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const userId = localStorage.getItem('userId');
-        if (!userId) {
+        // Get userId from Supabase session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
           setIsLoading(false);
           return;
         }
+
+        const userId = session.user.id;
 
         const { data, error } = await supabase
           .from('UserSetting')
           .select('*')
           .eq('userid', userId)
-          .single();
+          .maybeSingle(); // Use maybeSingle instead of single to avoid error when no row exists
 
         if (error) {
           console.error('Supabase error:', error);
@@ -104,12 +107,14 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
 
   const handleSave = async () => {
     try {
-      const userId = localStorage.getItem('userId');
-      if (!userId) {
+      // Get userId from Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
         toast.error('Vui lòng đăng nhập lại');
         return;
       }
 
+      const userId = session.user.id;
       const currentTheme = colorThemes[selectedTheme];
 
       const { error } = await supabase
@@ -206,8 +211,8 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
                   key={font.value}
                   onClick={() => setSelectedFont(font.value)}
                   className={`px-8 py-3 rounded-2xl border-2 transition-all shadow-sm ${selectedFont === font.value
-                      ? 'bg-[#D4E7F5] border-[#B8D4E8] text-[#111111]'
-                      : 'bg-[#FFF8E7] border-[#E0DCCC] text-[#111111] hover:bg-[#FFF4E0]'
+                    ? 'bg-[#D4E7F5] border-[#B8D4E8] text-[#111111]'
+                    : 'bg-[#FFF8E7] border-[#E0DCCC] text-[#111111] hover:bg-[#FFF4E0]'
                     }`}
                   style={{
                     fontFamily: font.value,
@@ -355,8 +360,8 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
                   key={index}
                   onClick={() => setSelectedTheme(index)}
                   className={`relative w-16 h-16 rounded-full border-4 transition-all ${selectedTheme === index
-                      ? 'border-[#111111] scale-110'
-                      : 'border-[#E0DCCC] hover:scale-105'
+                    ? 'border-[#111111] scale-110'
+                    : 'border-[#E0DCCC] hover:scale-105'
                     }`}
                   style={{
                     backgroundColor: theme.background,

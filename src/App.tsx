@@ -14,6 +14,7 @@ import { AudioSettingsPage } from './components/AudioSettingsPage';
 import { OCRImportPage } from './components/OCRImportPage';
 import { SettingsProvider } from './contexts/SettingsContext';
 import svgPaths from './imports/svg-jkvvruu31p';
+import { supabase } from './lib/supabaseClient';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -24,13 +25,30 @@ export default function App() {
   const [selectedReadingId, setSelectedReadingId] = useState<string | null>(null);
   const [selectedSpeakingId, setSelectedSpeakingId] = useState<string | null>(null);
 
-  // Check for existing session on mount
+  // Check for existing Supabase Auth session on mount
   useEffect(() => {
-    const storedUserId = localStorage.getItem('userId');
-    if (storedUserId) {
-      setUserId(storedUserId);
-      setIsAuthenticated(true);
-    }
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUserId(session.user.id);
+        setIsAuthenticated(true);
+      }
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.user) {
+          setUserId(session.user.id);
+          setIsAuthenticated(true);
+        } else {
+          setUserId(null);
+          setIsAuthenticated(false);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleLogin = (loggedInUserId: string) => {
@@ -40,16 +58,16 @@ export default function App() {
   };
 
   const handleRegister = () => {
-    // After successful registration, log the user in
-    setIsAuthenticated(true);
+    // After successful registration, don't auto-login
+    // User needs to login manually
     setShowRegister(false);
   };
 
-  const handleSignOut = () => {
-    // Clear localStorage
-    localStorage.removeItem('userId');
-    localStorage.removeItem('username');
+  const handleSignOut = async () => {
+    // Sign out from Supabase
+    await supabase.auth.signOut();
 
+    // Clear state
     setUserId(null);
     setIsAuthenticated(false);
     setShowRegister(false);

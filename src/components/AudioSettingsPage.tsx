@@ -37,17 +37,20 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const userId = localStorage.getItem('userId');
-        if (!userId) {
+        // Get userId from Supabase session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
           setIsLoading(false);
           return;
         }
+
+        const userId = session.user.id;
 
         const { data, error } = await supabase
           .from('UserSetting')
           .select('*')
           .eq('userid', userId)
-          .single();
+          .maybeSingle(); // Use maybeSingle to avoid error when no row exists
 
         if (error) {
           console.error('Supabase error:', error);
@@ -279,8 +282,8 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
                     key={voice.id}
                     onClick={() => handleVoiceSelect(voice.id)}
                     className={`flex-1 px-5 py-4 rounded-2xl border-2 transition-all shadow-sm ${selectedVoice === voice.id
-                        ? 'bg-[#D4E7F5] border-[#B8D4E8] shadow-md ring-2 ring-[#B8D4E8] ring-offset-2 ring-offset-[#FFFCF2]'
-                        : 'bg-[#FFF8E7] border-[#E0DCCC] hover:bg-[#FFF4E0] hover:shadow-md'
+                      ? 'bg-[#D4E7F5] border-[#B8D4E8] shadow-md ring-2 ring-[#B8D4E8] ring-offset-2 ring-offset-[#FFFCF2]'
+                      : 'bg-[#FFF8E7] border-[#E0DCCC] hover:bg-[#FFF4E0] hover:shadow-md'
                       }`}
                     style={{
                       fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -312,8 +315,8 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
                     key={voice.id}
                     onClick={() => handleVoiceSelect(voice.id)}
                     className={`flex-1 px-5 py-4 rounded-2xl border-2 transition-all shadow-sm ${selectedVoice === voice.id
-                        ? 'bg-[#D4E7F5] border-[#B8D4E8] shadow-md ring-2 ring-[#B8D4E8] ring-offset-2 ring-offset-[#FFFCF2]'
-                        : 'bg-[#FFF8E7] border-[#E0DCCC] hover:bg-[#FFF4E0] hover:shadow-md'
+                      ? 'bg-[#D4E7F5] border-[#B8D4E8] shadow-md ring-2 ring-[#B8D4E8] ring-offset-2 ring-offset-[#FFFCF2]'
+                      : 'bg-[#FFF8E7] border-[#E0DCCC] hover:bg-[#FFF4E0] hover:shadow-md'
                       }`}
                     style={{
                       fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",

@@ -9,32 +9,35 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) return;
+    if (!email.trim() || !password.trim()) return;
 
     try {
       setIsLoading(true);
 
-      // Query User table for matching username and password
-      const { data, error } = await supabase
-        .from('User')
-        .select('userid, username, password')
-        .eq('username', username.trim())
-        .single();
+      // Sign in with Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password
+      });
 
-      if (error || !data) {
-        toast.error('Tên đăng nhập không tồn tại!');
+      if (error) {
+        console.error('Login error:', error);
+        if (error.message.includes('Invalid login credentials')) {
+          toast.error('Email hoặc mật khẩu không đúng!');
+        } else {
+          toast.error('Lỗi khi đăng nhập: ' + error.message);
+        }
         setIsLoading(false);
         return;
       }
 
-      // Check password (in real app, should use hashed passwords)
-      if (data.password !== password) {
-        toast.error('Mật khẩu không đúng!');
+      if (!data.session) {
+        toast.error('Không thể tạo phiên đăng nhập');
         setIsLoading(false);
         return;
       }
@@ -42,11 +45,8 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
       // Login successful
       toast.success('Đăng nhập thành công!');
 
-      // Store user ID in localStorage
-      localStorage.setItem('userId', data.userid);
-      localStorage.setItem('username', data.username);
-
-      onLogin(data.userid);
+      // Pass user ID from auth session (UUID)
+      onLogin(data.session.user.id);
     } catch (error) {
       console.error('Login error:', error);
       toast.error('Lỗi khi đăng nhập. Vui lòng thử lại.');
@@ -89,7 +89,7 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
             {/* Login Button */}
             <button
               onClick={handleLogin}
-              disabled={!username.trim() || !password.trim() || isLoading}
+              disabled={!email.trim() || !password.trim() || isLoading}
               className="absolute bg-white h-[97px] left-[calc(50%+0.5px)] rounded-[27px] top-[479px] translate-x-[-50%] w-[480px] transition-all hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="h-[97px] overflow-clip relative rounded-[inherit] w-[480px]">
@@ -118,14 +118,14 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
               {/* Username Field */}
               <div className="content-stretch flex flex-col gap-[18px] h-[157px] items-start relative shrink-0 w-full">
                 <div className="h-[42px] relative shrink-0 w-full">
-                  <p className="absolute font-['Lexend',sans-serif] font-normal leading-[42px] left-0 text-[#111111] text-[42px] text-nowrap top-[-1px] tracking-[3.36px] whitespace-pre">Tên đăng nhập</p>
+                  <p className="absolute font-['Lexend',sans-serif] font-normal leading-[42px] left-0 text-[#111111] text-[42px] text-nowrap top-[-1px] tracking-[3.36px] whitespace-pre">Email</p>
                 </div>
                 <div className="bg-[#fff8e7] h-[97px] relative rounded-[27px] shrink-0 w-full">
                   <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Nhập tên của bạn"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Nhập email của bạn"
                     className="box-border flex h-[97px] items-center px-[36px] py-[27px] w-full bg-transparent font-['Lexend',sans-serif] font-normal text-[#111111] text-[26px] tracking-[3.12px] placeholder:text-[#999999] focus:outline-none rounded-[27px]"
                   />
                   <div aria-hidden="true" className="absolute border-2 border-[#e0dccc] border-solid inset-0 pointer-events-none rounded-[27px]" />
