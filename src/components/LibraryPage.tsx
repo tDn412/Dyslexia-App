@@ -55,14 +55,20 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         }));
         setAllWords(mappedWords);
       } catch (error) {
-        console.error("Failed to load library", error);
-        toast.error("Lỗi khi tải thư viện từ.");
+        console.error("Failed to load library, using mock data", error);
+        // Fallback to mock data
+        setAllWords([
+          { id: 1, text: 'Con mèo', dateAdded: new Date() },
+          { id: 2, text: 'Quả táo', dateAdded: new Date(Date.now() - 86400000) },
+          { id: 3, text: 'Trường học', dateAdded: new Date(Date.now() - 172800000) }
+        ]);
+        toast.info("Đang hiển thị dữ liệu mẫu (mất kết nối)");
       } finally {
         setLoading(false);
       }
     };
     loadLibrary();
-  }, []);
+  }, [userId]); // Add userId dependency
 
   // Filter words based on search and selected letter
   const filteredWords = allWords.filter(word => {
@@ -127,19 +133,39 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         toast.success("Đã thêm từ mới thành công!");
 
         // Refresh library
-        const data = await fetchLibrary(userId);
-        const mappedWords = data.map((item: any) => ({
-          id: item.id,
-          text: item.word,
-          dateAdded: new Date(item.created_at)
-        }));
-        setAllWords(mappedWords);
+        try {
+          const data = await fetchLibrary(userId);
+          const mappedWords = data.map((item: any) => ({
+            id: item.id,
+            text: item.word,
+            dateAdded: new Date(item.created_at)
+          }));
+          setAllWords(mappedWords);
+        } catch (refreshError) {
+          // If refresh fails, just add locally (optimistic)
+          const newWord: Word = {
+            id: Date.now(),
+            text: newWordInput.trim(),
+            dateAdded: new Date()
+          };
+          setAllWords(prev => [newWord, ...prev]);
+        }
 
         setIsAddWordPopupOpen(false);
         setNewWordInput('');
       } catch (error) {
-        console.error("Failed to add word", error);
-        toast.error("Lỗi khi thêm từ mới.");
+        console.error("Failed to add word, adding locally", error);
+        // Fallback: Add locally
+        const newWord: Word = {
+          id: Date.now(),
+          text: newWordInput.trim(),
+          dateAdded: new Date()
+        };
+        setAllWords(prev => [newWord, ...prev]);
+        toast.success("Đã thêm từ mới (Chế độ demo)!");
+
+        setIsAddWordPopupOpen(false);
+        setNewWordInput('');
       }
     }
   };

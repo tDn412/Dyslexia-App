@@ -48,9 +48,27 @@ export function QuizPlayerPage({ onNavigate, onSignOut, isSidebarCollapsed = fal
             try {
                 setLoading(true);
                 const data = await fetchQuizById(quizId);
-                // Parse questions if they are stored as JSON string or ensure structure
-                const parsedQuestions = typeof data.questions === 'string' ? JSON.parse(data.questions) : data.questions;
-                setQuiz({ ...data, questions: parsedQuestions });
+
+                // Extract questions from 'content' column
+                // content might be an object (if JSONB) or string
+                let contentObj = data.content;
+                if (typeof contentObj === 'string') {
+                    try {
+                        contentObj = JSON.parse(contentObj);
+                    } catch (e) {
+                        console.error("Failed to parse quiz content", e);
+                        contentObj = { questions: [] };
+                    }
+                }
+
+                // Questions are inside content.questions
+                const questions = contentObj?.questions || [];
+
+                setQuiz({
+                    ...data,
+                    id: data.quizid, // Map quizid to id for internal interface usage
+                    questions: questions
+                });
             } catch (error) {
                 console.error("Failed to load quiz", error);
                 toast.error("Lỗi khi tải bài kiểm tra.");

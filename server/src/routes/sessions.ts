@@ -16,45 +16,48 @@ router.get('/', async (req, res) => {
   // Fetch Reading Progress
   if (!type || type === 'reading') {
     const { data, error } = await supabase
-      .from('reading_progress')
-      .select('*, texts:content_ref_id(title, topic)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .from('ReadingProgress')
+      .select('*, Text(title, topic)')
+      .eq('userid', userId)
+      .order('createdat', { ascending: false });
 
     if (!error && data) {
       readingSessions = data.map(item => ({
-        id: item.progress_id,
+        id: item.progressid,
         type: 'reading',
-        userId: item.user_id,
-        materialId: item.content_ref_id,
-        materialTitle: item.texts?.title,
-        startedAt: item.created_at, // Using created_at as start time
-        progress: item.progress_percent,
-        accuracy: item.progress_percent // Assuming progress implies accuracy for reading
+        userId: item.userid,
+        materialId: item.contentrefid,
+        materialTitle: item.Text?.title,
+        startedAt: item.createdat,
+        progress: item.progresspercent,
+        accuracy: item.progresspercent
       }));
+    } else if (error) {
+      console.error('Error fetching reading sessions:', error);
     }
   }
 
   // Fetch Speaking Progress
   if (!type || type === 'speaking') {
     const { data, error } = await supabase
-      .from('speaking_progress')
-      .select('*, texts:text_id(title, topic)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .from('SpeakingProgress')
+      .select('*, Text(title, topic)') // Assuming reference to Text exists via contentrefid
+      .eq('userid', userId)
+      .order('createdat', { ascending: false });
 
     if (!error && data) {
       speakingSessions = data.map(item => ({
-        id: item.progress_id,
+        id: item.progressid,
         type: 'speaking',
-        userId: item.user_id,
-        materialId: item.text_id,
-        materialTitle: item.texts?.title,
-        startedAt: item.created_at,
-        accuracy: item.progress_percent,
-        errorCount: item.error_count,
+        userId: item.userid,
+        materialId: item.contentrefid,
+        materialTitle: item.Text?.title,
+        startedAt: item.createdat,
+        accuracy: item.progresspercent,
         analysis: item.analysis
       }));
+    } else if (error) {
+      console.error('Error fetching speaking sessions:', error);
     }
   }
 

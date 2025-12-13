@@ -1,8 +1,9 @@
 import { Sidebar } from './Sidebar';
 import { ReadingCard } from './ReadingCard';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from './ThemeContext';
+import { fetchReadings } from '../utils/api';
 
 interface SpeakingSelectionPageProps {
   onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
@@ -16,6 +17,9 @@ export function SpeakingSelectionPage({ onNavigate, onSignOut, isSidebarCollapse
   const [selectedLevel, setSelectedLevel] = useState<string>('All');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [topicScrollIndex, setTopicScrollIndex] = useState(0);
+  const [readings, setReadings] = useState<any[]>([]); // Dynamic readings
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   // Level filter options
   const levels = ['All', 'A1', 'A2', 'B1', 'B2'];
@@ -42,90 +46,30 @@ export function SpeakingSelectionPage({ onNavigate, onSignOut, isSidebarCollapse
     (topicScrollIndex + 1) * topicsPerView
   );
 
-  // Sample speaking materials
-  const readings = [
-    {
-      id: 1,
-      title: "Vườn Bướm",
-      topic: "Thiên nhiên",
-      level: "A1"
-    },
-    {
-      id: 2,
-      title: "Gia Đình Tôi",
-      topic: "Gia đình",
-      level: "A1"
-    },
-    {
-      id: 3,
-      title: "Động Vật Ở Sở Thú",
-      topic: "Động vật",
-      level: "A2"
-    },
-    {
-      id: 4,
-      title: "Một Ngày Ở Bãi Biển",
-      topic: "Thiên nhiên",
-      level: "A2"
-    },
-    {
-      id: 5,
-      title: "Chú Chó Thân Thiện",
-      topic: "Động vật",
-      level: "B1"
-    },
-    {
-      id: 6,
-      title: "Cuộc Phiêu Lưu Mùa Hè",
-      topic: "Truyện",
-      level: "B1"
-    },
-    {
-      id: 7,
-      title: "Giúp Đỡ Ở Nhà",
-      topic: "Gia đình",
-      level: "A1"
-    },
-    {
-      id: 8,
-      title: "Màu Sắc Xung Quanh",
-      topic: "Học tập",
-      level: "A1"
-    },
-    {
-      id: 9,
-      title: "Cây Thần Kỳ",
-      topic: "Truyện",
-      level: "B2"
-    },
-    {
-      id: 10,
-      title: "Hoa Quả Và Rau Củ",
-      topic: "Thức ăn",
-      level: "A1"
-    },
-    {
-      id: 11,
-      title: "Món Ăn Yêu Thích",
-      topic: "Thức ăn",
-      level: "A2"
-    },
-    {
-      id: 12,
-      title: "Chơi Ở Công Viên",
-      topic: "Phiêu lưu",
-      level: "B1"
-    },
-  ];
+  useEffect(() => {
+    const loadReadings = async () => {
+      try {
+        setIsLoading(true);
+        // Using same API as Reading Selection. Can filter by 'topic', 'level' via API params if needed, 
+        // or just fetch all and filter client side like before.
+        // Let's rely on client side filtering for consistency with previous mock logic if API doesn't support flexible filtering, 
+        // but fetchReadings supports level/topic/search.
+        // For broad selection, maybe fetch all (no filters) or use client filters.
+        // Let's use the API filters properly:
+        const data = await fetchReadings(selectedLevel, selectedTopic || undefined, searchQuery);
+        setReadings(data);
+      } catch (error) {
+        console.error("Failed to load speaking readings", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadReadings();
+  }, [selectedLevel, selectedTopic, searchQuery]);
 
-  // Filter readings based on selected level and topic
-  const filteredReadings = readings.filter((reading) => {
-    const levelMatch = selectedLevel === 'All' || reading.level === selectedLevel;
-    const topicMatch = !selectedTopic || reading.topic === selectedTopic;
-    return levelMatch && topicMatch;
-  });
-
-  const handleReadingClick = () => {
+  const handleReadingClick = (id: string) => {
+    // Store reading ID for speaking page
+    localStorage.setItem('currentReadingId', id);
     if (onNavigate) {
       onNavigate('Speaking');
     }
@@ -134,8 +78,8 @@ export function SpeakingSelectionPage({ onNavigate, onSignOut, isSidebarCollapse
   return (
     <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
       {/* Sidebar */}
-      <Sidebar 
-        activePage="Nói" 
+      <Sidebar
+        activePage="Nói"
         onNavigate={onNavigate}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
@@ -152,6 +96,8 @@ export function SpeakingSelectionPage({ onNavigate, onSignOut, isSidebarCollapse
               <input
                 type="text"
                 placeholder="Tìm kiếm bài nói..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full rounded-3xl pl-16 pr-6 py-5 placeholder:text-[#999999] focus:outline-none focus:ring-0 shadow-md transition-all border-2"
                 style={{
                   fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -190,7 +136,7 @@ export function SpeakingSelectionPage({ onNavigate, onSignOut, isSidebarCollapse
 
           {/* Topic Filter with Horizontal Scroll */}
           <div className="mb-12">
-            <div 
+            <div
               className="mb-4"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
@@ -259,21 +205,25 @@ export function SpeakingSelectionPage({ onNavigate, onSignOut, isSidebarCollapse
           </div>
 
           {/* Reading Cards Grid - 2 columns */}
-          <div className="grid grid-cols-2 gap-8">
-            {filteredReadings.map((reading) => (
-              <ReadingCard
-                key={reading.id}
-                title={reading.title}
-                topic={reading.topic}
-                level={`Cấp ${reading.level}`}
-                onClick={handleReadingClick}
-              />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="text-center py-20">Loading...</div>
+          ) : (
+            <div className="grid grid-cols-2 gap-8">
+              {readings.map((reading) => (
+                <ReadingCard
+                  key={reading.textid || reading.id}
+                  title={reading.title}
+                  topic={reading.topic}
+                  level={`Cấp ${reading.level}`}
+                  onClick={() => handleReadingClick(reading.textid || reading.id)}
+                />
+              ))}
+            </div>
+          )}
 
           {/* No results message */}
-          {filteredReadings.length === 0 && (
-            <div 
+          {readings.length === 0 && !isLoading && (
+            <div
               className="text-center text-[#666666] py-12"
               style={{
                 fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",

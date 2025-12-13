@@ -9,13 +9,22 @@ router.get('/', async (req, res) => {
   if (!userId) return res.status(400).json({ error: 'userId is required' });
 
   const { data, error } = await supabase
-    .from('library_words')
+    .from('LibraryWord')
     .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+    .eq('userid', userId)
+    .order('createdat', { ascending: false });
 
   if (error) return res.status(500).json(error);
-  res.json(data);
+  // Map back to expected structure if needed by frontend or update frontend to read new keys
+  // For now returning raw data, frontend update will handle this.
+  const mappedData = data?.map(item => ({
+    id: item.wordid,
+    word: item.word,
+    examples: item.ttsurl,
+    created_at: item.createdat,
+    user_id: item.userid
+  }));
+  res.json(mappedData);
 });
 
 // POST /api/library - Add word
@@ -25,9 +34,9 @@ router.post('/', async (req, res) => {
 
   // Check if word exists
   const { data: existing } = await supabase
-    .from('library_words')
+    .from('LibraryWord')
     .select('*')
-    .eq('user_id', userId)
+    .eq('userid', userId)
     .eq('word', word)
     .single();
 
@@ -36,13 +45,22 @@ router.post('/', async (req, res) => {
   }
 
   const { data, error } = await supabase
-    .from('library_words')
-    .insert([{ user_id: userId, word, tts_url: examples }])
+    .from('LibraryWord')
+    .insert([{ userid: userId, word, ttsurl: examples }])
     .select()
     .single();
 
   if (error) return res.status(500).json(error);
-  res.status(201).json(data);
+
+  // Map result
+  const mappedResult = {
+    id: data.wordid,
+    word: data.word,
+    examples: data.ttsurl,
+    created_at: data.createdat,
+    user_id: data.userid
+  };
+  res.status(201).json(mappedResult);
 });
 
 // DELETE /api/library/:id - Remove word
@@ -51,10 +69,10 @@ router.delete('/:id', async (req, res) => {
   if (!userId) return res.status(400).json({ error: 'userId is required' });
 
   const { error } = await supabase
-    .from('library_words')
+    .from('LibraryWord')
     .delete()
-    .eq('word_id', req.params.id)
-    .eq('user_id', userId);
+    .eq('wordid', req.params.id)
+    .eq('userid', userId);
 
   if (error) return res.status(500).json(error);
   res.status(204).send();

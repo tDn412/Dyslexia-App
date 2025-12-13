@@ -49,10 +49,10 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
         // Use userId from props or fallback
         const currentUserId = userId;
         const { data, error } = await supabase
-          .from('ocr_imports')
-          .select('ocr_id, file_name, created_at')
-          .eq('user_id', currentUserId)
-          .order('created_at', { ascending: false });
+          .from('OCRImport')
+          .select('ocrid, filename, createdat')
+          .eq('userid', currentUserId)
+          .order('createdat', { ascending: false });
 
         if (error) {
           console.error('Error loading OCR files:', error);
@@ -62,9 +62,9 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
 
         if (data) {
           const files = data.map(item => ({
-            id: item.ocr_id,
-            name: item.file_name,
-            dateAdded: new Date(item.created_at).toISOString().split('T')[0],
+            id: item.ocrid,
+            name: item.filename,
+            dateAdded: new Date(item.createdat).toISOString().split('T')[0],
           }));
           setReadingFiles(files);
         }
@@ -159,10 +159,10 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
       const currentUserId = userId;
       // Save to Supabase OCRImport table
       const { data: savedOCR, error: saveError } = await supabase
-        .from('ocr_imports')
+        .from('OCRImport')
         .insert({
-          user_id: currentUserId,
-          file_name: editedFilename,
+          userid: currentUserId,
+          filename: editedFilename,
           content: editedContent,
         })
         .select()
@@ -205,9 +205,9 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
 
       // Get content from OCRImport table
       const { data: ocrData, error: fetchError } = await supabase
-        .from('ocr_imports')
-        .select('content, file_name')
-        .eq('ocr_id', fileId)
+        .from('OCRImport')
+        .select('content, filename')
+        .eq('ocrid', fileId)
         .single();
 
       if (fetchError || !ocrData) {
@@ -222,14 +222,14 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
         .insert([
           {
             textid: 't_doc_' + timestamp,
-            title: ocrData.file_name,
+            title: ocrData.filename,
             content: ocrData.content,
             level: 'A1',
             topic: 'Đọc',
           },
           {
             textid: 't_noi_' + timestamp,
-            title: ocrData.file_name,
+            title: ocrData.filename,
             content: ocrData.content,
             level: 'A1',
             topic: 'Nói',

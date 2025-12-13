@@ -30,7 +30,8 @@ export default function App() {
 
 function AppContent() {
   const { themeColors } = useTheme();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Bypass login for now as requested by user
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [showRegister, setShowRegister] = useState(false);
   const [currentPage, setCurrentPage] = useState<'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport' | 'Exercise' | 'QuizPlayer'>('Home');

@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
   const topic = req.query.topic as string | undefined;
   const search = (req.query.search as string) || '';
 
-  let query = supabase.from('texts').select('*');
+  let query = supabase.from('Text').select('*');
 
   if (level && level !== 'All') {
     query = query.eq('level', level);
@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
 // ---------------- GET BY ID ------------------
 router.get('/:id', async (req, res) => {
   const { data, error } = await supabase
-    .from('texts')
+    .from('Text')
     .select('*')
     .eq('textid', req.params.id)
     .single();
@@ -56,8 +56,8 @@ router.post('/', async (req, res) => {
   if (!title) return res.status(400).json({ error: 'title is required' });
 
   const { data, error } = await supabase
-    .from('texts')
-    .insert([{ title, topic, level, content }])
+    .from('Text')
+    .insert([{ title, topic, level, content }]) // textid is auto-generated? Schema: textid uuid NOT NULL DEFAULT gen_random_uuid()
     .select()
     .single();
 
@@ -71,7 +71,7 @@ router.put('/:id', async (req, res) => {
   const updates = req.body;
 
   const { data, error } = await supabase
-    .from('texts')
+    .from('Text')
     .update(updates)
     .eq('textid', req.params.id)
     .select()
@@ -85,7 +85,7 @@ router.put('/:id', async (req, res) => {
 // ---------------- DELETE ------------------
 router.delete('/:id', async (req, res) => {
   const { error } = await supabase
-    .from('texts')
+    .from('Text')
     .delete()
     .eq('textid', req.params.id);
 

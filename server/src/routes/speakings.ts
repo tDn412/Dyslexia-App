@@ -64,31 +64,34 @@ router.post('/progress', async (req, res) => {
   try {
     // Check if progress exists
     const { data: existingProgress } = await supabase
-      .from('speaking_progress')
+      .from('SpeakingProgress')
       .select('*')
-      .eq('user_id', userId)
-      .eq('content_ref_id', textId)
+      .eq('userid', userId)
+      .eq('contentrefid', textId)
+      .eq('type', 'text') // Defaulting to 'text' as we are using textIds from sample list
       .single();
 
     if (existingProgress) {
       // Update if better or newer
       await supabase
-        .from('speaking_progress')
+        .from('SpeakingProgress')
         .update({
-          accuracy_score: accuracy,
-          words_correct: words, // Assuming words is a count or JSON
-          updated_at: new Date()
+          progresspercent: accuracy, // Using progresspercent for accuracy score
+          // words_correct: words, // Schema doesn't have words_correct. It has errorcount and details in 'analysis'.
+          // We can store words in 'analysis' jsonb if needed, but for now just updating score.
+          createdat: new Date() // Updating timestamp
         })
-        .eq('progress_id', existingProgress.progress_id);
+        .eq('progressid', existingProgress.progressid);
     } else {
       await supabase
-        .from('speaking_progress')
+        .from('SpeakingProgress')
         .insert({
-          user_id: userId,
-          content_ref_id: textId,
-          accuracy_score: accuracy,
-          words_correct: words,
-          created_at: new Date()
+          userid: userId,
+          contentrefid: textId,
+          type: 'text', // Default type
+          progresspercent: accuracy,
+          analysis: { words_correct: words }, // Storing words details in analysis JSONB
+          createdat: new Date()
         });
     }
 

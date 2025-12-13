@@ -12,21 +12,21 @@ router.get('/metrics', async (req, res) => {
   try {
     // 1. Get Reading Progress Count & Time (Estimate)
     const { data: readingData, error: readingError } = await supabase
-      .from('reading_progress')
-      .select('created_at')
-      .eq('user_id', userId);
+      .from('ReadingProgress')
+      .select('createdat')
+      .eq('userid', userId);
 
     // 2. Get Speaking Progress Count & Time (Estimate)
     const { data: speakingData, error: speakingError } = await supabase
-      .from('speaking_progress')
-      .select('created_at')
-      .eq('user_id', userId);
+      .from('SpeakingProgress')
+      .select('createdat')
+      .eq('userid', userId);
 
     // 3. Get Words Learned Count
     const { count: wordsCount, error: wordsError } = await supabase
-      .from('library_words')
+      .from('LibraryWord')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
+      .eq('userid', userId);
 
     if (readingError || speakingError || wordsError) {
       console.error('Error fetching metrics:', readingError, speakingError, wordsError);
@@ -42,8 +42,8 @@ router.get('/metrics', async (req, res) => {
 
     // Calculate Streak
     const allDates = [
-      ...(readingData?.map(d => new Date(d.created_at)) || []),
-      ...(speakingData?.map(d => new Date(d.created_at)) || [])
+      ...(readingData?.map(d => new Date(d.createdat)) || []),
+      ...(speakingData?.map(d => new Date(d.createdat)) || [])
     ].sort((a, b) => b.getTime() - a.getTime());
 
     let streakDays = 0;
@@ -98,19 +98,20 @@ router.get('/recent-reading', async (req, res) => {
 
   if (!userId) return res.status(400).json({ error: 'userId is required' });
 
-  const { data, error } = await supabase
-    .from('reading_progress')
-    .select('created_at, texts:content_ref_id(textid, title, content)')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+  // Fetch most recent reading progress
+  const { data: progressData, error: progressError } = await supabase
+    .from('ReadingProgress')
+    .select('createdat, contentrefid')
+    .eq('userid', userId)
+    .order('createdat', { ascending: false })
     .limit(1)
     .single();
 
-  if (error && error.code !== 'PGRST116') {
-    return res.status(500).json(error);
+  if (progressError && progressError.code !== 'PGRST116') {
+    return res.status(500).json(progressError);
   }
 
-  if (!data) {
+  if (!progressData) {
     // Return default/placeholder if no reading history
     return res.json({
       title: 'Chào mừng!',
@@ -120,14 +121,30 @@ router.get('/recent-reading', async (req, res) => {
     });
   }
 
-  const text = data.texts as any; // Type assertion since Supabase join returns object or array
-  const preview = text.content ? text.content.substring(0, 150) + '...' : '';
+  // Fetch the actual text content manually (since FK might be missing)
+  const { data: textData, error: textError } = await supabase
+    .from('Text')
+    .select('textid, title, content')
+    .eq('textid', progressData.contentrefid)
+    .single();
+
+  // If text not found (maybe deleted), handle gracefully
+  if (textError || !textData) {
+    return res.json({
+      title: 'Bài đọc không tồn tại',
+      preview: 'Bài đọc này có thể đã bị xóa.',
+      materialId: null,
+      lastReadAt: progressData.createdat
+    });
+  }
+
+  const preview = textData.content ? textData.content.substring(0, 150) + '...' : '';
 
   res.json({
-    title: text.title,
+    title: textData.title,
     preview: preview,
-    materialId: text.textid,
-    lastReadAt: data.created_at,
+    materialId: textData.textid,
+    lastReadAt: progressData.createdat,
   });
 });
 
@@ -139,23 +156,17 @@ router.get('/new-words', async (req, res) => {
   if (!userId) return res.status(400).json({ error: 'userId is required' });
 
   const { data, error } = await supabase
-    .from('library_words')
+    .from('LibraryWord')
     .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+    .eq('userid', userId)
+    .order('createdat', { ascending: false })
     .limit(limit);
 
   if (error) return res.status(500).json(error);
 
-  // Map to frontend expected format if needed, but library_words has 'word' and 'definition' (if added)
-  // Our schema has: word_id, user_id, word, tts_url, created_at. Definition might be missing in schema?
-  // Checking schema: library_words (word_id, user_id, word, tts_url, created_at)
-  // It seems we don't have 'definition' in the table. We might need to fetch it or just return word.
-  // For now, we'll return word and a placeholder definition or empty.
-
   const mappedData = data.map(item => ({
     word: item.word,
-    definition: '' // Definition not in table currently
+    definition: ''
   }));
 
   res.json(mappedData);

@@ -51,13 +51,13 @@ router.post('/upload', async (req, res) => {
 
     // Save to Supabase
     const { data, error } = await supabase
-      .from('ocr_imports')
+      .from('OCRImport')
       .insert([
         {
-          user_id: userId,
-          file_name: fileName,
+          userid: userId,
+          filename: fileName,
           content: extractedText,
-          tts_ready: false
+          ttsready: false
         }
       ])
       .select()
@@ -92,13 +92,13 @@ router.get('/files', async (req, res) => {
   }
 
   let query = supabase
-    .from('ocr_imports')
-    .select('ocr_id, file_name, created_at, tts_ready')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+    .from('OCRImport')
+    .select('ocrid, filename, createdat, ttsready')
+    .eq('userid', userId)
+    .order('createdat', { ascending: false });
 
   if (search) {
-    query = query.ilike('file_name', `%${search}%`);
+    query = query.ilike('filename', `%${search}%`);
   }
 
   const { data, error } = await query;
@@ -107,6 +107,12 @@ router.get('/files', async (req, res) => {
     return res.status(500).json(error);
   }
 
+  // Map for frontend compatibility if necessary, or let frontend use new keys
+  // Code in OCRImportPage.tsx uses: ocr_id, file_name, created_at
+  // I will map them here to avoid breaking too many things on frontend at once,
+  // OR strictly follow the "update frontend" plan.
+  // The plan says "Update OCRImportPage.tsx ... column references".
+  // So I will return the raw data (new keys) and update frontend to use new keys.
   res.json(data);
 });
 
@@ -119,16 +125,16 @@ router.get('/files/:id', async (req, res) => {
   }
 
   const { data, error } = await supabase
-    .from('ocr_imports')
+    .from('OCRImport')
     .select('*')
-    .eq('ocr_id', req.params.id)
+    .eq('ocrid', req.params.id)
     .single();
 
   if (error) {
     return res.status(404).json({ error: 'file not found' });
   }
 
-  if (data.user_id !== userId) {
+  if (data.userid !== userId) {
     return res.status(403).json({ error: 'forbidden' });
   }
 
@@ -145,14 +151,14 @@ router.put('/files/:id', async (req, res) => {
   }
 
   const updates: any = {};
-  if (name) updates.file_name = name;
+  if (name) updates.filename = name;
   if (content) updates.content = content;
 
   const { data, error } = await supabase
-    .from('ocr_imports')
+    .from('OCRImport')
     .update(updates)
-    .eq('ocr_id', req.params.id)
-    .eq('user_id', userId)
+    .eq('ocrid', req.params.id)
+    .eq('userid', userId)
     .select()
     .single();
 
@@ -170,10 +176,10 @@ router.delete('/files/:id', async (req, res) => {
   }
 
   const { error } = await supabase
-    .from('ocr_imports')
+    .from('OCRImport')
     .delete()
-    .eq('ocr_id', req.params.id)
-    .eq('user_id', userId);
+    .eq('ocrid', req.params.id)
+    .eq('userid', userId);
 
   if (error) return res.status(500).json(error);
 
