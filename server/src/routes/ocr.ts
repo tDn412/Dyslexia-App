@@ -82,6 +82,49 @@ router.post('/upload', async (req, res) => {
   }
 });
 
+// POST /api/ocr/save - Save already-extracted OCR text
+router.post('/save', async (req, res) => {
+  const userId = (req.body.userId as string) || (req.headers['x-user-id'] as string);
+  const { filename, content } = req.body ?? {};
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  if (!filename) {
+    return res.status(400).json({ error: 'filename is required' });
+  }
+
+  if (!content) {
+    return res.status(400).json({ error: 'content is required' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('OCRImport')
+      .insert([
+        {
+          userid: userId,
+          filename: filename,
+          content: content,
+          ttsready: false
+        }
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase save error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(data);
+  } catch (error: any) {
+    console.error('Save Error:', error);
+    res.status(500).json({ error: 'Failed to save OCR', details: error.message });
+  }
+});
+
 // GET /api/ocr/files - Get all OCR files for user
 router.get('/files', async (req, res) => {
   const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);

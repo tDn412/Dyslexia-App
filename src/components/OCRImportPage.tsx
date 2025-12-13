@@ -157,22 +157,25 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
   const handleSaveFromPreview = async (editedFilename: string, editedContent: string) => {
     try {
       const currentUserId = userId;
-      // Save to Supabase OCRImport table
-      const { data: savedOCR, error: saveError } = await supabase
-        .from('OCRImport')
-        .insert({
-          userid: currentUserId,
+
+      // Call backend API to save OCR
+      const response = await fetch(`http://localhost:4000/api/ocr/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUserId,
           filename: editedFilename,
           content: editedContent,
-        })
-        .select()
-        .single();
+        }),
+      });
 
-      if (saveError) {
-        console.error('Error saving to database:', saveError);
-        toast.error('Lỗi khi lưu văn bản: ' + saveError.message);
+      if (!response.ok) {
+        const error = await response.json();
+        toast.error('Lỗi khi lưu văn bản: ' + (error.error || 'Unknown error'));
         return;
       }
+
+      const savedOCR = await response.json();
 
       // Add the file to the reading list
       const newReading: ReadingFile = {
