@@ -25,45 +25,39 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'invalid email format' });
   }
 
-  // Check if user exists
-  const { data: existingUser } = await supabase
-    .from('users')
-    .select('*')
-    .or(`email.eq.${email},username.eq.${username}`)
-    .single();
-
-  if (existingUser) {
-    return res.status(409).json({ error: 'email or username already registered' });
-  }
-
-  // Create user
-  const { data: newUser, error } = await supabase
-    .from('users')
-    .insert([{
-      username,
+  try {
+    // Use Supabase Auth for registration
+    const { data, error } = await supabase.auth.signUp({
       email,
-      password, // In production, hash this password!
-      full_name: fullName,
-      age: birthDate ? new Date().getFullYear() - new Date(birthDate).getFullYear() : null
-    }])
-    .select()
-    .single();
+      password,
+      options: {
+        data: {
+          username,
+          full_name: fullName,
+          age: birthDate ? new Date().getFullYear() - new Date(birthDate).getFullYear() : null
+        }
+      }
+    });
 
-  if (error) {
+    if (error) {
+      console.error('Registration error:', error);
+      return res.status(400).json({ error: error.message || 'Registration failed' });
+    }
+
+    const token = signToken(data.user!.id);
+    res.status(201).json({
+      user: {
+        id: data.user!.id,
+        username,
+        email: data.user!.email,
+        fullName
+      },
+      token
+    });
+  } catch (error: any) {
     console.error('Registration error:', error);
-    return res.status(500).json({ error: 'Registration failed' });
+    res.status(500).json({ error: 'Registration failed' });
   }
-
-  const token = signToken(newUser.userid);
-  res.status(201).json({
-    user: {
-      id: newUser.userid,
-      username: newUser.username,
-      email: newUser.email,
-      fullName: newUser.full_name
-    },
-    token
-  });
 });
 
 router.post('/login', async (req, res) => {
@@ -73,27 +67,32 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'username and password are required' });
   }
 
-  // Try username first, then email (if we supported email login)
-  const { data: user, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('username', username)
-    .single();
+  try {
+    // Supabase Auth uses email for login, so we need to treat username as email
+    // Or modify to accept email in the frontend
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: username.includes('@') ? username : `${username}@temp.com`, // Fallback for username-only
+      password
+    });
 
-  if (error || !user || user.password !== password) {
-    return res.status(401).json({ error: 'invalid credentials' });
+    if (error) {
+      return res.status(401).json({ error: 'invalid credentials' });
+    }
+
+    const token = signToken(data.user.id);
+    res.json({
+      user: {
+        id: data.user.id,
+        username: data.user.user_metadata?.username || username,
+        email: data.user.email,
+        fullName: data.user.user_metadata?.full_name
+      },
+      token
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
   }
-
-  const token = signToken(user.userid);
-  res.json({
-    user: {
-      id: user.userid,
-      username: user.username,
-      email: user.email,
-      fullName: user.full_name
-    },
-    token
-  });
 });
 
 router.post('/logout', (_req, res) => {
