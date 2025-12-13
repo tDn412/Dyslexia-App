@@ -17,12 +17,14 @@ import { QuizPlayerPage } from './components/QuizPlayerPage';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { DisplaySettingsProvider } from './components/DisplaySettingsContext';
 import svgPaths from './imports/svg-jkvvruu31p';
+import { Toaster } from 'sonner';
 
 export default function App() {
   return (
     <ThemeProvider>
       <DisplaySettingsProvider>
         <AppContent />
+        <Toaster richColors position="top-right" />
       </DisplaySettingsProvider>
     </ThemeProvider>
   );
