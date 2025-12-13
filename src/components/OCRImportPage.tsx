@@ -233,34 +233,22 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
     }
   };
 
-  // Handle confirm from modal
-  const handleConfirmAddToText = async (topic: 'Đọc' | 'Nói' | 'both', level: string) => {
+  // Handle confirm from modal  
+  const handleConfirmAddToText = async (addTo: 'Đọc' | 'Nói' | 'both', level: string, category: string) => {
     try {
-      const textsToInsert = [];
-
-      if (topic === 'Đọc' || topic === 'both') {
-        textsToInsert.push({
-          textid: crypto.randomUUID(),
-          title: addModalFilename,
-          content: addModalContent,
-          level: level,
-          topic: 'Đọc',
-        });
-      }
-
-      if (topic === 'Nói' || topic === 'both') {
-        textsToInsert.push({
-          textid: crypto.randomUUID(),
-          title: addModalFilename,
-          content: addModalContent,
-          level: level,
-          topic: 'Nói',
-        });
-      }
+      // Note: Database doesn't have a field to distinguish Reading vs Speaking
+      // So we only insert ONE record that can be used for both purposes
+      const textToInsert = {
+        textid: crypto.randomUUID(),
+        title: addModalFilename,
+        content: addModalContent,
+        level: level,
+        topic: category, // topic field stores category (Động vật, Thiên nhiên...)
+      };
 
       const { error: saveError } = await supabase
         .from('Text')
-        .insert(textsToInsert);
+        .insert([textToInsert]);
 
       if (saveError) {
         console.error('Error saving to Text:', saveError);
@@ -270,8 +258,8 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
 
       setShowAddModal(false);
 
-      const topicText = topic === 'both' ? 'Đọc & Nói' : topic;
-      toast.success(`✅ Đã thêm vào ${topicText}! (Cấp ${level})`, {
+      const addToText = addTo === 'both' ? 'Đọc & Nói' : addTo;
+      toast.success(`✅ Đã thêm vào ${addToText}! (Cấp ${level}, ${category})`, {
         duration: 3000,
       });
     } catch (error) {
