@@ -2,6 +2,7 @@ import { useState } from 'react';
 import svgPaths from '../imports/svg-3zpfms6l7d';
 import { useTheme } from './ThemeContext';
 import { login } from '../utils/api';
+import { toast } from 'sonner';
 
 interface LoginPageProps {
   onLogin: (user: any) => void;
@@ -14,13 +15,17 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
   const [password, setPassword] = useState('');
 
   const handleLogin = async () => {
-    if (username.trim() && password.trim()) {
-      try {
-        const data = await login({ username, password });
-        onLogin(data.user);
-      } catch (error: any) {
-        alert(error.message || 'Đăng nhập thất bại');
-      }
+    if (!username.trim() || !password.trim()) {
+      toast.error('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu');
+      return;
+    }
+
+    try {
+      const data = await login({ username, password });
+      toast.success('Đăng nhập thành công!');
+      onLogin(data.user);
+    } catch (error: any) {
+      toast.error(error.message || 'Sai tên đăng nhập hoặc mật khẩu');
     }
   };
 

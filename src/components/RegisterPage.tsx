@@ -2,6 +2,7 @@ import { useState } from 'react';
 import svgPaths from '../imports/svg-3zpfms6l7d';
 import { useTheme } from './ThemeContext';
 import { register } from '../utils/api';
+import { toast } from 'sonner';
 
 interface RegisterPageProps {
   onRegister: (user: any) => void;
@@ -20,27 +21,34 @@ export function RegisterPage({ onRegister, onCancel }: RegisterPageProps) {
   const handleRegister = async () => {
     // Validation
     if (!fullName.trim() || !username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim() || !birthDate) {
-      alert('Vui lòng điền đầy đủ thông tin');
+      toast.error('Vui lòng điền đầy đủ thông tin');
       return;
     }
 
     if (password !== confirmPassword) {
-      alert('Mật khẩu không khớp');
+      toast.error('Mật khẩu không khớp');
       return;
     }
 
     // Simple email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      alert('Email không hợp lệ');
+      toast.error('Email không hợp lệ');
       return;
     }
 
     try {
       const data = await register({ fullName, username, email, password, confirmPassword, birthDate });
+      toast.success('Đăng ký thành công! Đang chuyển đến trang chủ...');
       onRegister(data.user);
     } catch (error: any) {
-      alert(error.message || 'Đăng ký thất bại');
+      // Backend returns specific errors like "email or username already registered"
+      const errorMessage = error.message || 'Đăng ký thất bại';
+      if (errorMessage.includes('already') || errorMessage.includes('đã tồn tại')) {
+        toast.error('Tên đăng nhập hoặc email đã được sử dụng');
+      } else {
+        toast.error(errorMessage);
+      }
     }
   };
 
