@@ -30,8 +30,7 @@ export default function App() {
 
 function AppContent() {
   const { themeColors } = useTheme();
-  // Bypass login for now as requested by user
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [showRegister, setShowRegister] = useState(false);
   const [currentPage, setCurrentPage] = useState<'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport' | 'Exercise' | 'QuizPlayer'>('Home');
@@ -91,7 +90,7 @@ function AppContent() {
     isSidebarCollapsed,
     onToggleCollapse: () => setIsSidebarCollapsed(!isSidebarCollapsed),
     onSignOut: handleSignOut,
-    userId: user?.id || 'demo-user-id' // Pass userId to all components
+    userId: user?.id || 'dbe2f7eb-4b2f-49d0-a7fa-b6fb5a5a0ab2' // Use actual UUID from Supabase
   };
 
   if (currentPage === 'ReadingSelection') {
