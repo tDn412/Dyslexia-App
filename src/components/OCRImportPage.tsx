@@ -6,6 +6,7 @@ import { api } from '../utils/api';
 import { toast } from 'sonner';
 import { supabase } from '../supabaseClient';
 import { OCRPreviewModal } from './OCRPreviewModal';
+import { AddToTextModal } from './AddToTextModal';
 import { useTheme } from './ThemeContext';
 
 interface OCRImportPageProps {
@@ -37,31 +38,36 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
   const [previewFilename, setPreviewFilename] = useState('');
   const [previewContent, setPreviewContent] = useState('');
 
+  // Add to Text Modal states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addModalFileId, setAddModalFileId] = useState<string>('');
+  const [addModalFilename, setAddModalFilename] = useState('');
+  const [addModalContent, setAddModalContent] = useState('');
+
   // Reading files from OCRImport table
   const [readingFiles, setReadingFiles] = useState<ReadingFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load OCR files from Supabase on mount
+  // Load OCR files from backend API on mount
   useEffect(() => {
     const loadOCRFiles = async () => {
       try {
         setIsLoading(true);
-        // Use userId from props or fallback
         const currentUserId = userId;
-        const { data, error } = await supabase
-          .from('OCRImport')
-          .select('ocrid, filename, createdat')
-          .eq('userid', currentUserId)
-          .order('createdat', { ascending: false });
 
-        if (error) {
-          console.error('Error loading OCR files:', error);
+        // Use backend API instead of direct Supabase
+        const response = await fetch(`http://localhost:4000/api/ocr/files?userId=${currentUserId}`);
+
+        if (!response.ok) {
+          console.error('Error loading OCR files:', response.statusText);
           toast.error('Không thể tải danh sách file OCR');
           return;
         }
 
+        const data = await response.json();
+
         if (data) {
-          const files = data.map(item => ({
+          const files = data.map((item: any) => ({
             id: item.ocrid,
             name: item.filename,
             dateAdded: new Date(item.createdat).toISOString().split('T')[0],
@@ -70,6 +76,7 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
         }
       } catch (error) {
         console.error('Error:', error);
+        toast.error('Lỗi kết nối server');
       } finally {
         setIsLoading(false);
       }
@@ -200,44 +207,60 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
     setPreviewContent('');
   };
 
-  // Add to Reading tab
+  // Add to Reading tab - open modal
   const handleAddToReading = async (fileId: string) => {
     try {
       const file = readingFiles.find(f => f.id === fileId);
       if (!file) return;
 
-      // Get content from OCRImport table
-      const { data: ocrData, error: fetchError } = await supabase
-        .from('OCRImport')
-        .select('content, filename')
-        .eq('ocrid', fileId)
-        .single();
-
-      if (fetchError || !ocrData) {
+      // Get content from backend API
+      const response = await fetch(`http://localhost:4000/api/ocr/files/${fileId}?userId=${userId}`);
+      if (!response.ok) {
         toast.error('Không thể tải nội dung file OCR');
         return;
       }
 
-      // Save to Text table for both Reading and Speaking
-      const timestamp = Date.now();
+      const ocrData = await response.json();
+
+      // Open modal with file data
+      setAddModalFileId(fileId);
+      setAddModalFilename(ocrData.filename);
+      setAddModalContent(ocrData.content);
+      setShowAddModal(true);
+    } catch (error) {
+      console.error('Add to Reading error:', error);
+      toast.error('Không thể tải nội dung file');
+    }
+  };
+
+  // Handle confirm from modal
+  const handleConfirmAddToText = async (topic: 'Đọc' | 'Nói' | 'both', level: string) => {
+    try {
+      const textsToInsert = [];
+
+      if (topic === 'Đọc' || topic === 'both') {
+        textsToInsert.push({
+          textid: crypto.randomUUID(),
+          title: addModalFilename,
+          content: addModalContent,
+          level: level,
+          topic: 'Đọc',
+        });
+      }
+
+      if (topic === 'Nói' || topic === 'both') {
+        textsToInsert.push({
+          textid: crypto.randomUUID(),
+          title: addModalFilename,
+          content: addModalContent,
+          level: level,
+          topic: 'Nói',
+        });
+      }
+
       const { error: saveError } = await supabase
         .from('Text')
-        .insert([
-          {
-            textid: 't_doc_' + timestamp,
-            title: ocrData.filename,
-            content: ocrData.content,
-            level: 'A1',
-            topic: 'Đọc',
-          },
-          {
-            textid: 't_noi_' + timestamp,
-            title: ocrData.filename,
-            content: ocrData.content,
-            level: 'A1',
-            topic: 'Nói',
-          }
-        ]);
+        .insert(textsToInsert);
 
       if (saveError) {
         console.error('Error saving to Text:', saveError);
@@ -245,11 +268,14 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
         return;
       }
 
-      toast.success('✅ Đã thêm vào Đọc & Nói!', {
+      setShowAddModal(false);
+
+      const topicText = topic === 'both' ? 'Đọc & Nói' : topic;
+      toast.success(`✅ Đã thêm vào ${topicText}! (Cấp ${level})`, {
         duration: 3000,
       });
     } catch (error) {
-      console.error('Add to Reading error:', error);
+      console.error('Add to Text error:', error);
       toast.error('Không thể thêm bài');
     }
   };
@@ -268,14 +294,33 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
     }
   };
 
-  const handleConfirmEdit = () => {
+  const handleConfirmEdit = async () => {
     if (editingFileId && editedFileName.trim()) {
-      setReadingFiles(readingFiles.map(file =>
-        file.id === editingFileId
-          ? { ...file, name: editedFileName.trim() }
-          : file
-      ));
-      handleCancelEdit();
+      try {
+        // Update in database via backend API
+        const response = await fetch(`http://localhost:4000/api/ocr/files/${editingFileId}?userId=${userId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: editedFileName.trim() }),
+        });
+
+        if (!response.ok) {
+          toast.error('Lỗi khi sửa tên file');
+          return;
+        }
+
+        // Update local state
+        setReadingFiles(readingFiles.map(file =>
+          file.id === editingFileId
+            ? { ...file, name: editedFileName.trim() }
+            : file
+        ));
+        handleCancelEdit();
+        toast.success('Đã sửa tên file!');
+      } catch (error) {
+        console.error('Edit error:', error);
+        toast.error('Lỗi khi sửa tên file');
+      }
     }
   };
 
@@ -285,8 +330,25 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
     setEditedFileName('');
   };
 
-  const handleDeleteReading = (id: string) => {
-    setReadingFiles(readingFiles.filter(file => file.id !== id));
+  const handleDeleteReading = async (id: string) => {
+    try {
+      // Delete from database via backend API
+      const response = await fetch(`http://localhost:4000/api/ocr/files/${id}?userId=${userId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        toast.error('Lỗi khi xóa file');
+        return;
+      }
+
+      // Update local state
+      setReadingFiles(readingFiles.filter(file => file.id !== id));
+      toast.success('Đã xóa file!');
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Lỗi khi xóa file');
+    }
   };
 
   // Close popup when clicking outside or pressing Escape
@@ -669,6 +731,15 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
           extractedText={previewContent}
           onCancel={handleCancelPreview}
           onSave={handleSaveFromPreview}
+        />
+
+        {/* Add to Text Modal */}
+        <AddToTextModal
+          isOpen={showAddModal}
+          filename={addModalFilename}
+          content={addModalContent}
+          onCancel={() => setShowAddModal(false)}
+          onConfirm={handleConfirmAddToText}
         />
       </main>
     </div>
