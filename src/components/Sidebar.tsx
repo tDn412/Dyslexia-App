@@ -162,9 +162,9 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
           <div>
             <h3
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '20px',
-                letterSpacing: '0.02em',
+                fontFamily: 'var(--display-font-family)',
+                fontSize: 'calc(var(--display-font-size) * 0.8)',
+                letterSpacing: 'var(--display-letter-spacing)',
                 color: themeColors.textMain,
               }}
             >
@@ -172,9 +172,9 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
             </h3>
             <p
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '18px',
-                letterSpacing: '0.02em',
+                fontFamily: 'var(--display-font-family)',
+                fontSize: 'calc(var(--display-font-size) * 0.7)',
+                letterSpacing: 'var(--display-letter-spacing)',
                 color: themeColors.textMuted,
               }}
             >
@@ -197,9 +197,9 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
                   onClick={() => handleNavClick(item.page)}
                   className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all"
                   style={{
-                    fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                    fontSize: '22px',
-                    letterSpacing: '0.02em',
+                    fontFamily: 'var(--display-font-family)',
+                    fontSize: 'calc(var(--display-font-size) * 0.85)',
+                    letterSpacing: 'var(--display-letter-spacing)',
                     backgroundColor: isActive ? themeColors.accentMain : 'transparent',
                     color: isActive ? themeColors.textMain : themeColors.textSecondary,
                   }}
@@ -220,9 +220,9 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
             onClick={() => setShowSignOutDialog(true)}
             className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-[#D32F2F] hover:bg-[#FFEBEE] transition-all"
             style={{
-              fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-              fontSize: '22px',
-              letterSpacing: '0.02em',
+              fontFamily: 'var(--display-font-family)',
+              fontSize: 'calc(var(--display-font-size) * 0.85)',
+              letterSpacing: 'var(--display-letter-spacing)',
             }}
           >
             <LogOut className="w-9 h-9" />
@@ -238,9 +238,9 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
             <AlertDialogTitle
               className="text-center"
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '28px',
-                letterSpacing: '0.12em',
+                fontFamily: 'var(--display-font-family)',
+                fontSize: 'calc(var(--display-font-size) * 1.1)',
+                letterSpacing: 'var(--display-letter-spacing)',
                 color: themeColors.textMain,
               }}
             >
@@ -249,9 +249,9 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
             <AlertDialogDescription
               className="text-center"
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '24px',
-                letterSpacing: '0.12em',
+                fontFamily: 'var(--display-font-family)',
+                fontSize: 'calc(var(--display-font-size) * 0.9)',
+                letterSpacing: 'var(--display-letter-spacing)',
                 color: themeColors.textMuted,
               }}
             >
@@ -262,9 +262,9 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
             <AlertDialogCancel
               className="border-2 rounded-2xl px-8 py-4 shadow-sm m-0 hover:opacity-80"
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '24px',
-                letterSpacing: '0.12em',
+                fontFamily: 'var(--display-font-family)',
+                fontSize: 'calc(var(--display-font-size) * 0.9)',
+                letterSpacing: 'var(--display-letter-spacing)',
                 backgroundColor: themeColors.cardBackground,
                 borderColor: themeColors.border,
                 color: themeColors.textMain,
@@ -279,9 +279,9 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
               }}
               className="bg-[#D32F2F] border-2 border-[#B71C1C] text-white hover:bg-[#B71C1C] rounded-2xl px-8 py-4 shadow-sm"
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '24px',
-                letterSpacing: '0.12em',
+                fontFamily: 'var(--display-font-family)',
+                fontSize: 'calc(var(--display-font-size) * 0.9)',
+                letterSpacing: 'var(--display-letter-spacing)',
               }}
             >
               Có

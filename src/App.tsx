@@ -187,11 +187,11 @@ function AppContent() {
           <div className="mb-8">
             <h1
               style={{
-                fontFamily: "'Lexend', sans-serif",
-                fontSize: '42px',
+                fontFamily: 'var(--display-font-family)',
+                fontSize: 'calc(var(--display-font-size) * 1.6)',
                 fontWeight: '500',
-                lineHeight: '1.5',
-                letterSpacing: '0.12em',
+                lineHeight: 'var(--display-line-spacing)',
+                letterSpacing: 'var(--display-letter-spacing)',
                 color: themeColors.textMain,
               }}
             >
@@ -217,10 +217,10 @@ function AppContent() {
               <h2
                 className="mb-6"
                 style={{
-                  fontFamily: "'Lexend', sans-serif",
-                  fontSize: '28px',
-                  lineHeight: '1.4',
-                  letterSpacing: '0.12em',
+                  fontFamily: 'var(--display-font-family)',
+                  fontSize: 'calc(var(--display-font-size) * 1.1)',
+                  lineHeight: 'var(--display-line-spacing)',
+                  letterSpacing: 'var(--display-letter-spacing)',
                   color: themeColors.textMain,
                 }}
               >
@@ -232,10 +232,10 @@ function AppContent() {
                 <p
                   className="mb-4"
                   style={{
-                    fontFamily: "'Lexend', sans-serif",
-                    fontSize: '24px',
-                    lineHeight: '1.5',
-                    letterSpacing: '0.12em',
+                    fontFamily: 'var(--display-font-family)',
+                    fontSize: 'calc(var(--display-font-size) * 0.9)',
+                    lineHeight: 'var(--display-line-spacing)',
+                    letterSpacing: 'var(--display-letter-spacing)',
                     color: themeColors.textMain,
                   }}
                 >
@@ -245,10 +245,10 @@ function AppContent() {
                   onClick={() => setCurrentPage('ReadingSelection')}
                   className="flex items-center gap-3 hover:opacity-70 transition-colors"
                   style={{
-                    fontFamily: "'Lexend', sans-serif",
-                    fontSize: '24px',
+                    fontFamily: 'var(--display-font-family)',
+                    fontSize: 'calc(var(--display-font-size) * 0.9)',
                     lineHeight: '1.4',
-                    letterSpacing: '0.12em',
+                    letterSpacing: 'var(--display-letter-spacing)',
                     color: themeColors.textMain,
                   }}
                 >
@@ -280,10 +280,10 @@ function AppContent() {
               <h2
                 className="mb-6"
                 style={{
-                  fontFamily: "'Lexend', sans-serif",
-                  fontSize: '28px',
-                  lineHeight: '1.4',
-                  letterSpacing: '0.12em',
+                  fontFamily: 'var(--display-font-family)',
+                  fontSize: 'calc(var(--display-font-size) * 1.1)',
+                  lineHeight: 'var(--display-line-spacing)',
+                  letterSpacing: 'var(--display-letter-spacing)',
                   color: themeColors.textMain,
                 }}
               >
@@ -312,11 +312,11 @@ function AppContent() {
             <div className="flex items-center justify-between mb-6">
               <h2
                 style={{
-                  fontFamily: "'Lexend', sans-serif",
-                  fontSize: '34px',
+                  fontFamily: 'var(--display-font-family)',
+                  fontSize: 'calc(var(--display-font-size) * 1.3)',
                   fontWeight: '500',
-                  lineHeight: '1.5',
-                  letterSpacing: '0.12em',
+                  lineHeight: 'var(--display-line-spacing)',
+                  letterSpacing: 'var(--display-letter-spacing)',
                   color: themeColors.textMain,
                 }}
               >
@@ -328,11 +328,11 @@ function AppContent() {
               >
                 <span
                   style={{
-                    fontFamily: "'Lexend', sans-serif",
-                    fontSize: '24px',
+                    fontFamily: 'var(--display-font-family)',
+                    fontSize: 'calc(var(--display-font-size) * 0.9)',
                     fontWeight: '500',
                     lineHeight: '1.4',
-                    letterSpacing: '0.12em',
+                    letterSpacing: 'var(--display-letter-spacing)',
                     color: themeColors.textMain,
                   }}
                 >
@@ -357,10 +357,10 @@ function AppContent() {
                 >
                   <p
                     style={{
-                      fontFamily: "'Lexend', sans-serif",
-                      fontSize: '30px',
-                      lineHeight: '1.3',
-                      letterSpacing: '0.14em',
+                      fontFamily: 'var(--display-font-family)',
+                      fontSize: 'calc(var(--display-font-size) * 1.15)',
+                      lineHeight: 'var(--display-line-spacing)',
+                      letterSpacing: 'var(--display-letter-spacing)',
                       color: themeColors.textMain,
                     }}
                   >

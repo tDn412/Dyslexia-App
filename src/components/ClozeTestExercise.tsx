@@ -85,10 +85,10 @@ function CompletionModal({ onBackToList, themeColors }: CompletionModalProps) {
         <h2
           className="text-center mb-12"
           style={{
-            fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-            fontSize: '38px',
-            lineHeight: '1.3',
-            letterSpacing: '0.14em',
+            fontFamily: 'var(--display-font-family)',
+            fontSize: 'calc(var(--display-font-size) * 1.5)',
+            lineHeight: 'var(--display-line-spacing)',
+            letterSpacing: 'var(--display-letter-spacing)',
             color: themeColors.textMain,
           }}
         >
@@ -107,9 +107,9 @@ function CompletionModal({ onBackToList, themeColors }: CompletionModalProps) {
               padding: '18px 50px',
               boxShadow: `0 6px 20px ${themeColors.shadow}`,
               border: 'none',
-              fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-              fontSize: '28px',
-              letterSpacing: '0.12em',
+              fontFamily: 'var(--display-font-family)',
+              fontSize: 'calc(var(--display-font-size) * 1.1)',
+              letterSpacing: 'var(--display-letter-spacing)',
             }}
           >
             Về danh sách
@@ -460,254 +460,229 @@ export function ClozeTestExercise({ onNavigate, onSignOut, isSidebarCollapsed, o
           )}
         </div>
 
-        {/* Split Screen Content */}
-        <div className="flex-1 flex gap-8 px-12 pb-8 overflow-hidden">
-          {/* Left Column - Text with Blanks */}
-          <div
-            className="flex-[3] overflow-auto flex flex-col"
-            style={{
-              backgroundColor: themeColors.cardBackground,
-              border: `3px solid ${themeColors.border}`,
-              borderRadius: '28px',
-              padding: '40px',
-              boxShadow: `0 6px 16px ${themeColors.shadow}`,
-            }}
-          >
-            <h2
-              className="mb-8"
-              style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '32px',
-                lineHeight: '1.3',
-                letterSpacing: '0.14em',
-                color: themeColors.textMain,
-              }}
-            >
-              {selectedExercise.title}
-            </h2>
+        {/* Split Screen Content Wrapper - Full Screen */}
+        <div className="flex-1 w-full flex overflow-hidden">
+          {/* Container chính: Full màn hình không có padding */}
+          <div className="flex-1 h-full flex gap-2 w-full p-2">
 
-            {/* Text with inline blanks */}
+            {/* Left Column - Text with Blanks */}
             <div
+              className="flex flex-col h-full overflow-auto"
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '26px',
-                lineHeight: '2.2',
-                letterSpacing: '0.14em',
-                color: themeColors.textMain,
+                flex: '3 0 0%', // Forces 3/4 width regardless of content
+                backgroundColor: themeColors.cardBackground,
+                border: `3px solid ${themeColors.border}`,
+                borderRadius: '28px',
+                padding: '40px',
+                boxShadow: `0 6px 16px ${themeColors.shadow}`,
               }}
             >
-              {selectedExercise.questions[currentQuestionIndex].textSegments.map((segment, index) => {
-                if (typeof segment === 'string') {
-                  return segment.split('\n').map((line, i, arr) => (
-                    <span key={`${index}-${i}`}>
-                      {line}
-                      {i < arr.length - 1 && <br />}
-                    </span>
-                  ));
-                } else {
-                  // It's a blank space
-                  const blank = segment;
-                  const isIncorrect = showHint && incorrectBlanks.includes(blank.id);
-                  const isCheckedWrong = hasChecked && filledBlanks[blank.id] !== blank.correctAnswer;
-
-                  let backgroundColor = 'transparent';
-                  let borderColor = themeColors.border;
-
-                  if (isIncorrect || isCheckedWrong) {
-                    backgroundColor = '#FFE9ED';
-                    borderColor = '#FFC0CB';
-                  } else if (filledBlanks[blank.id]) {
-                    backgroundColor = themeColors.accentMain;
-                  }
-
-                  return (
-                    <span key={index} className="inline-block relative" style={{ margin: '0 4px' }}>
-                      {/* Blank space drop zone */}
-                      <button
-                        onClick={() => handleBlankClick(blank.id)}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => handleDrop(blank.id)}
-                        disabled={hasChecked}
-                        className="transition-all duration-200"
-                        style={{
-                          minWidth: '80px',
-                          height: '48px',
-                          backgroundColor,
-                          border: `3px dashed ${borderColor}`,
-                          borderRadius: '12px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: hasChecked ? 'default' : 'pointer',
-                          padding: '0 12px',
-                          verticalAlign: 'middle',
-                        }}
-                      >
-                        {filledBlanks[blank.id] && (
-                          <span
-                            style={{
-                              fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                              fontSize: '26px',
-                              color: themeColors.textMain,
-                            }}
-                          >
-                            {filledBlanks[blank.id]}
-                          </span>
-                        )}
-                      </button>
-                    </span>
-                  );
-                }
-              })}
-            </div>
-          </div>
-
-          {/* Right Column - Options Pool */}
-          <div
-            className="flex-[1] flex flex-col"
-            style={{
-              backgroundColor: themeColors.cardBackground,
-              border: `3px solid ${themeColors.border}`,
-              borderRadius: '28px',
-              padding: '40px',
-              boxShadow: `0 6px 16px ${themeColors.shadow}`,
-            }}
-          >
-            {/* Question Number */}
-            <div
-              className="mb-6"
-              style={{
-                fontFamily: "'Lexend', sans-serif",
-                fontSize: '22px',
-                lineHeight: '1.5',
-                letterSpacing: '0.12em',
-                color: themeColors.textSecondary,
-              }}
-            >
-              Câu {currentQuestionIndex + 1}/{selectedExercise.questions.length}
-            </div>
-
-            <h3
-              className="mb-4"
-              style={{
-                fontFamily: "'Lexend', sans-serif",
-                fontSize: '24px',
-                lineHeight: '1.5',
-                letterSpacing: '0.12em',
-                color: themeColors.textSecondary,
-              }}
-            >
-              Kéo thả vào chỗ trống
-            </h3>
-
-            {/* Option Buttons */}
-            <div className="flex-1 flex flex-col gap-4 mb-8">
-              {selectedExercise.questions[currentQuestionIndex].options.map((option, index) => (
-                <motion.div
-                  key={index}
-                  draggable={!hasChecked}
-                  onDragStart={() => handleDragStart(option)}
-                  onDragEnd={handleDragEnd}
-                  whileHover={!hasChecked ? { scale: 1.05 } : {}}
-                  className="transition-all duration-200 cursor-grab active:cursor-grabbing"
-                  style={{
-                    backgroundColor: themeColors.accentMain,
-                    border: `3px solid ${themeColors.border}`,
-                    borderRadius: '20px',
-                    padding: '24px',
-                    boxShadow: `0 6px 16px ${themeColors.shadow}, 0 2px 8px rgba(0,0,0,0.1)`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative',
-                    cursor: hasChecked ? 'default' : 'grab',
-                  }}
-                >
-                  {/* 3D Stack Effect */}
-                  <div
-                    className="absolute inset-0 rounded-[20px]"
-                    style={{
-                      backgroundColor: themeColors.accentMain,
-                      opacity: 0.5,
-                      transform: 'translate(4px, 4px)',
-                      zIndex: -1,
-                      border: `3px solid ${themeColors.border}`,
-                    }}
-                  />
-
-                  <span
-                    style={{
-                      fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                      fontSize: '36px',
-                      lineHeight: '1',
-                      letterSpacing: '0.12em',
-                      color: themeColors.textMain,
-                      fontWeight: '600',
-                    }}
-                  >
-                    {option}
-                  </span>
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Check Button at bottom of right column */}
-            {!hasChecked ? (
-              <button
-                onClick={handleCheck}
-                disabled={!allBlanksFilled}
-                className="transition-all duration-200 hover:scale-105 active:scale-95"
+              <h2
+                className="mb-8"
                 style={{
-                  backgroundColor: allBlanksFilled ? '#4CAF50' : themeColors.border,
-                  color: '#FFFFFF',
-                  borderRadius: '20px',
-                  padding: '18px 40px',
-                  boxShadow: `0 6px 20px ${themeColors.shadow}`,
-                  border: 'none',
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                  fontSize: '28px',
-                  letterSpacing: '0.12em',
-                  cursor: allBlanksFilled ? 'pointer' : 'not-allowed',
-                  opacity: allBlanksFilled ? 1 : 0.5,
+                  fontFamily: 'var(--display-font-family)',
+                  fontSize: 'calc(var(--display-font-size) * 1.2)',
+                  lineHeight: 'var(--display-line-spacing)',
+                  letterSpacing: 'var(--display-letter-spacing)',
+                  color: themeColors.textMain,
                 }}
               >
-                Kiểm tra
-              </button>
-            ) : (
-              <div>
-                {allCorrect ? (
-                  <button
-                    onClick={handleContinue}
-                    className="transition-all duration-200 hover:scale-105 active:scale-95"
+                {selectedExercise.title}
+              </h2>
+
+              {/* Text with inline blanks */}
+              <div
+                style={{
+                  fontFamily: 'var(--display-font-family)',
+                  fontSize: 'var(--display-font-size)',
+                  lineHeight: 'var(--display-line-spacing)',
+                  letterSpacing: 'var(--display-letter-spacing)',
+                  color: themeColors.textMain,
+                }}
+              >
+                {selectedExercise.questions[currentQuestionIndex].textSegments.map((segment, index) => {
+                  if (typeof segment === 'string') {
+                    return segment.split('\n').map((line, i, arr) => (
+                      <span key={`${index}-${i}`}>
+                        {line}
+                        {i < arr.length - 1 && <br />}
+                      </span>
+                    ));
+                  } else {
+                    // It's a blank space
+                    const blank = segment;
+                    const isIncorrect = showHint && incorrectBlanks.includes(blank.id);
+                    const isCheckedWrong = hasChecked && filledBlanks[blank.id] !== blank.correctAnswer;
+
+                    let backgroundColor = 'transparent';
+                    let borderColor = themeColors.border;
+
+                    if (isIncorrect || isCheckedWrong) {
+                      backgroundColor = '#FFE9ED';
+                      borderColor = '#FFC0CB';
+                    } else if (filledBlanks[blank.id]) {
+                      backgroundColor = themeColors.accentMain;
+                    }
+
+                    return (
+                      <span key={index} className="inline-block relative" style={{ margin: '0 4px' }}>
+                        {/* Blank space drop zone */}
+                        <button
+                          onClick={() => handleBlankClick(blank.id)}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => handleDrop(blank.id)}
+                          disabled={hasChecked}
+                          className="transition-all duration-200"
+                          style={{
+                            minWidth: '80px',
+                            height: '48px',
+                            backgroundColor,
+                            border: `3px dashed ${borderColor}`,
+                            borderRadius: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: hasChecked ? 'default' : 'pointer',
+                            padding: '0 12px',
+                            verticalAlign: 'middle',
+                          }}
+                        >
+                          {filledBlanks[blank.id] && (
+                            <span
+                              style={{
+                                fontFamily: 'var(--display-font-family)',
+                                fontSize: 'var(--display-font-size)',
+                                color: themeColors.textMain,
+                              }}
+                            >
+                              {filledBlanks[blank.id]}
+                            </span>
+                          )}
+                        </button>
+                      </span>
+                    );
+                  }
+                })}
+              </div>
+            </div>
+
+            {/* Right Column - Options Pool */}
+            <div
+              className="flex flex-col h-full"
+              style={{
+                flex: '1 0 0%', // Forces 1/4 width regardless of content
+                backgroundColor: themeColors.cardBackground,
+                border: `3px solid ${themeColors.border}`,
+                borderRadius: '28px',
+                padding: '40px',
+                boxShadow: `0 6px 16px ${themeColors.shadow}`,
+              }}
+            >
+              {/* Question Number */}
+              <div
+                className="mb-6"
+                style={{
+                  fontFamily: 'var(--display-font-family)',
+                  fontSize: 'calc(var(--display-font-size) * 0.8)',
+                  lineHeight: 'var(--display-line-spacing)',
+                  letterSpacing: 'var(--display-letter-spacing)',
+                  color: themeColors.textSecondary,
+                }}
+              >
+                Câu {currentQuestionIndex + 1}/{selectedExercise.questions.length}
+              </div>
+
+              <h3
+                className="mb-4"
+                style={{
+                  fontFamily: 'var(--display-font-family)',
+                  fontSize: 'calc(var(--display-font-size) * 0.9)',
+                  lineHeight: 'var(--display-line-spacing)',
+                  letterSpacing: 'var(--display-letter-spacing)',
+                  color: themeColors.textSecondary,
+                }}
+              >
+                Kéo thả vào chỗ trống
+              </h3>
+
+              {/* Option Buttons */}
+              <div className="flex-1 flex flex-col gap-4 mb-8">
+                {selectedExercise.questions[currentQuestionIndex].options.map((option, index) => (
+                  <motion.div
+                    key={index}
+                    draggable={!hasChecked}
+                    onDragStart={() => handleDragStart(option)}
+                    onDragEnd={handleDragEnd}
+                    whileHover={!hasChecked ? { scale: 1.05 } : {}}
+                    className="transition-all duration-200 cursor-grab active:cursor-grabbing"
                     style={{
-                      backgroundColor: '#4CAF50',
-                      color: '#FFFFFF',
+                      backgroundColor: themeColors.accentMain,
+                      border: `3px solid ${themeColors.border}`,
                       borderRadius: '20px',
-                      padding: '18px 40px',
-                      boxShadow: `0 6px 20px ${themeColors.shadow}`,
-                      border: 'none',
-                      fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                      fontSize: '28px',
-                      letterSpacing: '0.12em',
+                      padding: '24px',
+                      boxShadow: `0 6px 16px ${themeColors.shadow}, 0 2px 8px rgba(0,0,0,0.1)`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                      cursor: hasChecked ? 'default' : 'grab',
                     }}
                   >
-                    Câu tiếp theo
-                  </button>
-                ) : (
-                  <div>
-                    <p
-                      className="mb-4"
+                    {/* 3D Stack Effect */}
+                    <div
+                      className="absolute inset-0 rounded-[20px]"
                       style={{
-                        fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                        fontSize: '24px',
-                        color: '#FF6B6B',
-                        letterSpacing: '0.12em',
+                        backgroundColor: themeColors.accentMain,
+                        opacity: 0.5,
+                        transform: 'translate(4px, 4px)',
+                        zIndex: -1,
+                        border: `3px solid ${themeColors.border}`,
+                      }}
+                    />
+
+                    <span
+                      style={{
+                        fontFamily: 'var(--display-font-family)',
+                        fontSize: 'calc(var(--display-font-size) * 1.4)',
+                        lineHeight: '1',
+                        letterSpacing: 'var(--display-letter-spacing)',
+                        color: themeColors.textMain,
+                        fontWeight: '600',
                       }}
                     >
-                      Chưa chính xác, bé thử lại nhé
-                    </p>
+                      {option}
+                    </span>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Check Button at bottom of right column */}
+              {!hasChecked ? (
+                <button
+                  onClick={handleCheck}
+                  disabled={!allBlanksFilled}
+                  className="transition-all duration-200 hover:scale-105 active:scale-95"
+                  style={{
+                    backgroundColor: allBlanksFilled ? '#4CAF50' : themeColors.border,
+                    color: '#FFFFFF',
+                    borderRadius: '20px',
+                    padding: '18px 40px',
+                    boxShadow: `0 6px 20px ${themeColors.shadow}`,
+                    border: 'none',
+                    fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                    fontSize: '28px',
+                    letterSpacing: '0.12em',
+                    cursor: allBlanksFilled ? 'pointer' : 'not-allowed',
+                    opacity: allBlanksFilled ? 1 : 0.5,
+                  }}
+                >
+                  Kiểm tra
+                </button>
+              ) : (
+                <div>
+                  {allCorrect ? (
                     <button
-                      onClick={() => setHasChecked(false)}
+                      onClick={handleContinue}
                       className="transition-all duration-200 hover:scale-105 active:scale-95"
                       style={{
                         backgroundColor: '#4CAF50',
@@ -721,12 +696,43 @@ export function ClozeTestExercise({ onNavigate, onSignOut, isSidebarCollapsed, o
                         letterSpacing: '0.12em',
                       }}
                     >
-                      Thử lại
+                      Câu tiếp theo
                     </button>
-                  </div>
-                )}
-              </div>
-            )}
+                  ) : (
+                    <div>
+                      <p
+                        className="mb-4"
+                        style={{
+                          fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                          fontSize: '24px',
+                          color: '#FF6B6B',
+                          letterSpacing: '0.12em',
+                        }}
+                      >
+                        Chưa chính xác, bé thử lại nhé
+                      </p>
+                      <button
+                        onClick={() => setHasChecked(false)}
+                        className="transition-all duration-200 hover:scale-105 active:scale-95"
+                        style={{
+                          backgroundColor: '#4CAF50',
+                          color: '#FFFFFF',
+                          borderRadius: '20px',
+                          padding: '18px 40px',
+                          boxShadow: `0 6px 20px ${themeColors.shadow}`,
+                          border: 'none',
+                          fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                          fontSize: '28px',
+                          letterSpacing: '0.12em',
+                        }}
+                      >
+                        Thử lại
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

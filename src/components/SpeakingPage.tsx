@@ -1,7 +1,7 @@
 import { Sidebar } from './Sidebar';
 import { SpeakingToolbar } from './SpeakingToolbar';
 import { QuickSettingsDrawer } from './QuickSettingsDrawer';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from './ThemeContext';
 import { analyzeSpeaking, fetchReadingById } from '../utils/api';
 import { toast } from 'sonner';
@@ -12,6 +12,7 @@ interface SpeakingPageProps {
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
   userId?: string;
+  textid?: string;
 }
 
 export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, userId = 'demo-user-id' }: SpeakingPageProps) {
@@ -45,81 +46,58 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
     loadReading();
   }, []);
 
-  // Initialize Speech Recognition
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'vi-VN';
-
-      recognitionRef.current.onresult = (event: any) => {
-        let fullTranscript = '';
-        for (let i = 0; i < event.results.length; ++i) {
-          fullTranscript += event.results[i][0].transcript;
-        }
-
-        setTranscript(fullTranscript);
-        syncHighlighting(fullTranscript);
-      };
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error("Speech recognition error", event.error);
-        if (event.error === 'no-speech') {
-          return; // Ignore no-speech errors
-        }
-        setIsRecording(false);
-        toast.error("Lỗi nhận diện giọng nói: " + event.error);
-      };
-      // ...
-      // Helper to clean text for matching
-      const cleanText = (text: string) => text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").split(/\s+/).filter(w => w.length > 0);
-
-      const syncHighlighting = (currentTranscript: string) => {
-        const transcriptWords = cleanText(currentTranscript);
-        const contentWords = cleanText(readingContent);
-
-        // Find the last matching word index
-        let matchIndex = -1;
-        for (let i = 0; i < transcriptWords.length; i++) {
-          if (i < contentWords.length && transcriptWords[i] === contentWords[i]) {
-            matchIndex = i;
-          }
-        }
-
-        // Map back to the display 'words' array (which includes spaces/punctuation)
-        if (matchIndex >= 0) {
-          let realWordCount = 0;
-          for (let i = 0; i < words.length; i++) {
-            if (words[i].trim().length > 0 && !/^[.,\/#!$%\^&\*;:{}=\-_`~()]+$/.test(words[i])) {
-              if (realWordCount === matchIndex) {
-                setCurrentWordIndex(i);
-                break;
-              }
-              realWordCount++;
-            }
-          }
-        }
-      };
-
-      recognitionRef.current.onend = () => {
-        if (isRecording) {
-          // Restart if it stopped unexpectedly while recording
-          try {
-            recognitionRef.current.start();
-          } catch (e) {
-            setIsRecording(false);
-          }
-        }
-      };
-    } else {
-      toast.error("Trình duyệt của bạn không hỗ trợ nhận diện giọng nói.");
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      toast.error("Trình duyệt không hỗ trợ nhận diện giọng nói.");
+      return;
     }
-  }, [isRecording]);
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'vi-VN';
+
+    recognition.onresult = (event: any) => {
+      let fullTranscript = '';
+      for (let i = 0; i < event.results.length; i++) {
+        fullTranscript += event.results[i][0].transcript;
+      }
+      setTranscript(fullTranscript);
+    };
+
+    recognition.onerror = (event: any) => {
+      if (event.error !== 'no-speech') {
+        console.error(event.error);
+        toast.error("Lỗi nhận diện giọng nói: " + event.error);
+      }
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.stop();
+    };
+  }, []);
+
 
   // Split text into words, preserving punctuation
-  const words = readingContent.split(/(\s+)/);
+  const words = useMemo(
+    () => readingContent.split(/(\s+)/),
+    [readingContent]
+  );
+
+  useEffect(() => {
+    if (!transcript) return;
+
+    const spokenWords = transcript.trim().split(/\s+/).length;
+    setCurrentWordIndex(Math.min(spokenWords * 2, words.length - 1));
+  }, [transcript, words]);
+
+
 
   // Timer effect
   useEffect(() => {
@@ -147,9 +125,11 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
     if (isRecording) {
       // Stop recording
       if (recognitionRef.current) {
+        recognitionRef.current.onend = null;
         recognitionRef.current.stop();
       }
       setIsRecording(false);
+
 
       // Analyze
       try {
@@ -157,17 +137,43 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
         const textId = localStorage.getItem('currentReadingId') || 'unknown';
         const result = await analyzeSpeaking(userId, textId, readingContent, transcript);
 
-        // Assuming result.wordScores is an array of indices of incorrect words or similar
-        // For now, let's just simulate some feedback based on the result
-        toast.success(`Độ chính xác: ${result.accuracy.toFixed(1)}%`);
+        const accuracy =
+          typeof result?.accuracy === 'number'
+            ? result.accuracy
+            : 0;
 
-        // This is a simplification. Real alignment is complex.
-        // We'll just mark random words as incorrect for demo if accuracy is low
-        if (result.accuracy < 80) {
-          setIncorrectWords([2, 5, 8]); // Mock
-        } else {
-          setIncorrectWords([]);
-        }
+        toast.success(`Độ chính xác: ${accuracy.toFixed(1)}%`);
+
+        console.log("Analyze result:", result);
+
+        // ===== So khớp transcript để tìm từ sai =====
+        const normalize = (text: string) =>
+          text
+            .toLowerCase()
+            .replace(/[.,!?;]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const expectedWords = normalize(readingContent).split(' ');
+        const spokenWords = normalize(transcript).split(' ');
+
+        // map word index (bỏ qua space/punctuation)
+        const wordIndexes: number[] = [];
+        words.forEach((w, i) => {
+          if (w.trim() && !/^[.,!?]+$/.test(w)) {
+            wordIndexes.push(i);
+          }
+        });
+
+        const wrongWordIndexes: number[] = [];
+
+        expectedWords.forEach((word, i) => {
+          if (spokenWords[i] !== word && wordIndexes[i] !== undefined) {
+            wrongWordIndexes.push(wordIndexes[i]);
+          }
+        });
+
+        setIncorrectWords(wrongWordIndexes);
 
       } catch (error) {
         console.error("Analysis failed", error);
@@ -180,12 +186,12 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
       setIncorrectWords([]);
       if (recognitionRef.current) {
         try {
-          recognitionRef.current.start();
+          recognitionRef.current?.start();
           setIsRecording(true);
-        } catch (e) {
-          console.error("Failed to start recording", e);
+        } catch {
           toast.error("Không thể bắt đầu ghi âm.");
         }
+
       }
     }
   };
@@ -246,25 +252,30 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
             <div
               className="absolute top-6 right-8 text-[#555555]"
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '20px',
-                letterSpacing: '0.02em',
+                fontFamily: 'var(--display-font-family)',
+                fontSize: 'calc(var(--display-font-size) * 0.8)',
+                letterSpacing: 'var(--display-letter-spacing)',
               }}
             >
               {formatTime(seconds)}
             </div>
 
             {/* Title */}
-            <h1 className="text-2xl font-bold mb-4" style={{ color: themeColors.textMain }}>{readingTitle}</h1>
+            <h1 className="text-2xl font-bold mb-4" style={{
+              color: themeColors.textMain,
+              fontFamily: 'var(--display-font-family)',
+              fontSize: 'calc(var(--display-font-size) * 1.5)',
+              letterSpacing: 'var(--display-letter-spacing)',
+            }}>{readingTitle}</h1>
 
             {/* Text with word highlighting */}
             <div
               className="text-[#111111] mx-auto"
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '26px',
-                lineHeight: '1.8',
-                letterSpacing: '0.14em',
+                fontFamily: 'var(--display-font-family)',
+                fontSize: 'var(--display-font-size)',
+                lineHeight: 'var(--display-line-spacing)',
+                letterSpacing: 'var(--display-letter-spacing)',
                 maxWidth: '66ch',
                 wordSpacing: '0.16em',
               }}
