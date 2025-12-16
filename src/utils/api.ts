@@ -175,8 +175,9 @@ export async function analyzeSpeaking(userId: string, textId: string, referenceT
     return response.json();
 }
 
-export async function fetchQuizzes() {
-    const response = await fetch(`${API_URL}/quizzes`);
+export async function fetchQuizzes(type?: string) {
+    const url = type ? `${API_URL}/quizzes?skill=${type}` : `${API_URL}/quizzes`;
+    const response = await fetch(url);
     if (!response.ok) throw new Error('Failed to fetch quizzes');
     return response.json();
 }

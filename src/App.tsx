@@ -14,6 +14,10 @@ import { AudioSettingsPage } from './components/AudioSettingsPage';
 import { OCRImportPage } from './components/OCRImportPage';
 import { ExercisePage } from './components/ExercisePage';
 import { QuizPlayerPage } from './components/QuizPlayerPage';
+import { VisualSpellingExercise } from './components/VisualSpellingExercise';
+import { ListenSpellingExercise } from './components/ListenSpellingExercise';
+import { ReadingComprehensionExercise } from './components/ReadingComprehensionExercise';
+import { ClozeTestExercise } from './components/ClozeTestExercise';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { DisplaySettingsProvider } from './components/DisplaySettingsContext';
 import svgPaths from './imports/svg-jkvvruu31p';
@@ -35,7 +39,7 @@ function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [showRegister, setShowRegister] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport' | 'Exercise' | 'QuizPlayer'>('Home');
+  const [currentPage, setCurrentPage] = useState<'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport' | 'Exercise' | 'QuizPlayer' | 'VisualSpelling' | 'ListenSpelling' | 'ReadingComprehension' | 'ClozeTest'>('Home');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const handleLogin = (userData: any) => {
@@ -83,7 +87,7 @@ function AppContent() {
     if (currentPage === 'Library') return 'Thư viện';
     if (currentPage === 'OCRImport') return 'Nhập OCR';
     if (currentPage === 'SettingsOverview' || currentPage === 'DisplaySettings' || currentPage === 'AudioSettings') return 'Cài đặt';
-    if (currentPage === 'Exercise' || currentPage === 'QuizPlayer') return 'Bài tập';
+    if (currentPage === 'Exercise' || currentPage === 'QuizPlayer' || currentPage === 'VisualSpelling' || currentPage === 'ListenSpelling' || currentPage === 'ReadingComprehension' || currentPage === 'ClozeTest') return 'Bài tập';
     return 'Trang chủ';
   };
 
@@ -137,6 +141,22 @@ function AppContent() {
 
   if (currentPage === 'QuizPlayer') {
     return <QuizPlayerPage {...commonProps} />;
+  }
+
+  if (currentPage === 'VisualSpelling') {
+    return <VisualSpellingExercise {...commonProps} />;
+  }
+
+  if (currentPage === 'ListenSpelling') {
+    return <ListenSpellingExercise {...commonProps} />;
+  }
+
+  if (currentPage === 'ReadingComprehension') {
+    return <ReadingComprehensionExercise {...commonProps} />;
+  }
+
+  if (currentPage === 'ClozeTest') {
+    return <ClozeTestExercise {...commonProps} />;
   }
 
   // Sample data for the reading preview
