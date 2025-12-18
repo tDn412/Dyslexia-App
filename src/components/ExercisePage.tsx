@@ -80,11 +80,11 @@ export function ExercisePage({ onNavigate, onSignOut, isSidebarCollapsed = false
           <div className="mb-12">
             <h1
               style={{
-                fontFamily: "'Lexend', sans-serif",
-                fontSize: '42px',
+                fontFamily: 'var(--display-font-family)',
+                fontSize: 'calc(var(--display-font-size) * 1.6)',
                 fontWeight: '500',
-                lineHeight: '1.5',
-                letterSpacing: '0.12em',
+                lineHeight: 'var(--display-line-spacing)',
+                letterSpacing: 'var(--display-letter-spacing)',
                 color: themeColors.textMain,
               }}
             >
@@ -137,11 +137,11 @@ export function ExercisePage({ onNavigate, onSignOut, isSidebarCollapsed = false
                   {/* Title */}
                   <h2
                     style={{
-                      fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                      fontSize: '32px',
+                      fontFamily: 'var(--display-font-family)',
+                      fontSize: 'calc(var(--display-font-size) * 1.2)',
                       fontWeight: '600',
-                      lineHeight: '1.3',
-                      letterSpacing: '0.14em',
+                      lineHeight: 'var(--display-line-spacing)',
+                      letterSpacing: 'var(--display-letter-spacing)',
                       color: themeColors.textMain,
                     }}
                   >
@@ -151,10 +151,10 @@ export function ExercisePage({ onNavigate, onSignOut, isSidebarCollapsed = false
                   {/* Description */}
                   <p
                     style={{
-                      fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                      fontSize: '22px',
-                      lineHeight: '1.5',
-                      letterSpacing: '0.12em',
+                      fontFamily: 'var(--display-font-family)',
+                      fontSize: 'calc(var(--display-font-size) * 0.9)',
+                      lineHeight: 'var(--display-line-spacing)',
+                      letterSpacing: 'var(--display-letter-spacing)',
                       maxWidth: '400px',
                       color: themeColors.textSecondary,
                       opacity: 0.9,

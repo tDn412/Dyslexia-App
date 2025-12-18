@@ -3,7 +3,7 @@ import { SpeakingToolbar } from './SpeakingToolbar';
 import { QuickSettingsDrawer } from './QuickSettingsDrawer';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from './ThemeContext';
-import { analyzeSpeaking, fetchReadingById } from '../utils/api';
+import { api, fetchReadingById } from '../utils/api';
 import { toast } from 'sonner';
 
 interface SpeakingPageProps {
@@ -12,7 +12,6 @@ interface SpeakingPageProps {
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
   userId?: string;
-  textid?: string;
 }
 
 export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, userId = 'demo-user-id' }: SpeakingPageProps) {
@@ -26,7 +25,13 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
   const [readingContent, setReadingContent] = useState<string>('');
   const [readingTitle, setReadingTitle] = useState<string>('');
   const [transcript, setTranscript] = useState('');
+
+  // Real-time Ref
   const recognitionRef = useRef<any>(null);
+
+  // Scores
+  const [finalScore, setFinalScore] = useState<{ accuracy: number, details: any[] } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   useEffect(() => {
     const loadReading = async () => {
@@ -37,7 +42,8 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
       }
       try {
         const data = await fetchReadingById(id);
-        setReadingContent(data.content);
+        const cleanContent = data.content.replace(/\s+/g, ' ').trim();
+        setReadingContent(cleanContent);
         setReadingTitle(data.title);
       } catch (error) {
         console.error("Failed to load reading", error);
@@ -47,16 +53,14 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
     loadReading();
   }, []);
 
+  // Initialize Speech Recognition
   useEffect(() => {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      toast.error("Trình duyệt không hỗ trợ nhận diện giọng nói.");
+      toast.error("Trình duyệt không hỗ trợ nhận diện giọng nói realtime.");
       return;
     }
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -72,223 +76,141 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
 
     recognition.onerror = (event: any) => {
       if (event.error !== 'no-speech') {
-        console.error(event.error);
-        toast.error("Lỗi nhận diện giọng nói: " + event.error);
+        console.warn("Speech recognition error:", event.error);
       }
     };
 
     recognitionRef.current = recognition;
-
-    return () => {
-      recognition.stop();
-    };
   }, []);
 
+  // Split content into clean words
+  const words = useMemo(() => {
+    return readingContent.split(/\s+/).filter(w => w.trim().length > 0);
+  }, [readingContent]);
 
-  // Split text into words, preserving punctuation
-  const words = useMemo(
-    () => readingContent.split(/(\s+)/),
-    [readingContent]
-  );
-
+  // Real-time Matching Logic (The "Green/Red" Logic)
   useEffect(() => {
-    if (!transcript) return;
+    if (!transcript || !isRecording) return;
 
-    const spokenWords = transcript.trim().split(/\s+/).length;
-    setCurrentWordIndex(Math.min(spokenWords * 2, words.length - 1));
-  }, [transcript, words]);
+    // Normalize text for comparison
+    const normalize = (s: string) => s.toLowerCase().replace(/[.,!?;:()"]/g, '').trim();
 
+    // Convert transcript to array of words
+    const spokenList = transcript.split(/\s+/).map(normalize).filter(Boolean);
 
+    // Current analysis state
+    const newCorrect: number[] = [];
+    const newIncorrect: number[] = [];
+    let processingIndex = 0; // Where we are in the reference text (words)
 
-  // Timer effect
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    // Greedy matching algorithm
+    for (const spokenWord of spokenList) {
+      // Look ahead up to 3 words to handle skips
+      let foundMatch = false;
+      for (let offset = 0; offset <= 3; offset++) {
+        const targetIndex = processingIndex + offset;
+        if (targetIndex >= words.length) break;
 
-    if (isRecording) {
-      interval = setInterval(() => {
-        setSeconds((s) => s + 1);
-      }, 1000);
+        const targetWord = normalize(words[targetIndex]);
+
+        // Fuzzy match could go here, but strict for now or simple includes
+        if (targetWord === spokenWord || (targetWord.length > 3 && (targetWord.includes(spokenWord) || spokenWord.includes(targetWord)))) {
+          // Found a match at targetIndex
+          newCorrect.push(targetIndex);
+
+          // All words strictly *before* this targetIndex (and after previous match) are wrong
+          for (let skipped = processingIndex; skipped < targetIndex; skipped++) {
+            newIncorrect.push(skipped);
+          }
+
+          processingIndex = targetIndex + 1;
+          foundMatch = true;
+          break;
+        }
+      }
+      // If no match found, this spoken word is extra/wrong, we just ignore it in the UI mapping usually 
+      // OR we could mark the *next* word as tentatively wrong? 
+      // For this simple logic: we only advance on matches.
     }
 
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    setCorrectWords(newCorrect);
+    setIncorrectWords(newIncorrect);
+    setCurrentWordIndex(processingIndex); // Auto-scroll cursor
+
+  }, [transcript, isRecording, words]);
+
+  // Timer
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isRecording) {
+      interval = setInterval(() => setSeconds(s => s + 1), 1000);
+    }
+    return () => { if (interval) clearInterval(interval); };
   }, [isRecording]);
 
-  // Format time as MM:SS
+  const handleToggleRecording = () => {
+    if (isRecording) {
+      // STOP RECORDING
+      setIsRecording(false);
+      if (recognitionRef.current) recognitionRef.current.stop();
+
+      // Calculate Score Locally based on "Words Read" (Attempted)
+      // We assume the user reads sequentially. The "read" portion is up to the furthest word they engaged with.
+      const maxIndex = Math.max(-1, ...correctWords, ...incorrectWords);
+      const wordsAttempted = words.slice(0, maxIndex + 1).filter(w => w.trim().length > 0 && !/^[.,!?;:()"]+$/.test(w)).length;
+
+      const uniqueCorrect = new Set(correctWords).size;
+
+      const accuracy = wordsAttempted > 0
+        ? Math.min(100, (uniqueCorrect / wordsAttempted) * 100)
+        : 0;
+
+      setFinalScore({
+        accuracy: accuracy,
+        details: []
+      });
+
+      toast.success(`Đánh giá hoàn tất!`);
+
+    } else {
+      // START RECORDING
+      setSeconds(0);
+      setTranscript('');
+      setCorrectWords([]);
+      setIncorrectWords([]);
+      setFinalScore(null);
+
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+          setIsRecording(true);
+        } catch {
+          toast.error("Không thể bắt đầu ghi âm.");
+        }
+      }
+    }
+  };
+
+  const handleReset = () => {
+    if (isRecording) {
+      setIsRecording(false);
+      if (recognitionRef.current) recognitionRef.current.stop();
+    }
+    setTranscript('');
+    setSeconds(0);
+    setCorrectWords([]);
+    setIncorrectWords([]);
+    setFinalScore(null);
+  };
+
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
-  const mapToWordUIIndex = (wordIndex: number) => {
-    let realCount = 0;
-    for (let i = 0; i < words.length; i++) {
-      if (words[i].trim() && !/^[.,!?]+$/.test(words[i])) {
-        if (realCount === wordIndex) return i;
-        realCount++;
-      }
-    }
-    return -1;
-  };
-
-
-  const handleToggleRecording = async () => {
-    if (isRecording) {
-      // Stop recording
-      if (recognitionRef.current) {
-        recognitionRef.current.onend = null;
-        recognitionRef.current.stop();
-      }
-      setIsRecording(false);
-
-
-      // Analyze
-      try {
-        // userId is now from props
-        const textId = localStorage.getItem('currentReadingId') || 'unknown';
-        const result = await analyzeSpeaking(userId, textId, readingContent, transcript);
-
-        const accuracy =
-          typeof result?.accuracy === 'number'
-            ? result.accuracy
-            : 0;
-
-        toast.success(`Độ chính xác: ${accuracy.toFixed(1)}%`);
-
-        console.log("Analyze result:", result);
-
-        // ===== So khớp transcript để tìm từ đúng / sai =====
-        const normalize = (text: string) =>
-          text
-            .toLowerCase()
-            .replace(/[.,!?;]/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-        const expectedWords = normalize(readingContent).split(' ');
-        const spokenWords = normalize(transcript).split(' ');
-
-        // Map index từ expectedWords → UI words
-        const wordIndexes: number[] = [];
-        words.forEach((w, i) => {
-          if (w.trim() && !/^[.,!?]+$/.test(w)) {
-            wordIndexes.push(i);
-          }
-        });
-
-        const wrongWordIndexes: number[] = [];
-        const correctWordIndexes: number[] = [];
-
-        let spokenIndex = 0;
-
-        expectedWords.forEach((expectedWord, expectedIndex) => {
-          const uiIndex = wordIndexes[expectedIndex];
-          if (uiIndex === undefined) return;
-
-          if (spokenIndex >= spokenWords.length) {
-            wrongWordIndexes.push(uiIndex);
-            return;
-          }
-
-          if (spokenWords[spokenIndex] === expectedWord) {
-            correctWordIndexes.push(uiIndex);
-            spokenIndex++;
-            return;
-          }
-
-          if (
-            spokenIndex + 1 < spokenWords.length &&
-            spokenWords[spokenIndex + 1] === expectedWord
-          ) {
-            correctWordIndexes.push(uiIndex);
-            spokenIndex += 2; // bỏ qua từ thừa
-            return;
-          }
-
-          wrongWordIndexes.push(uiIndex);
-          spokenIndex++;
-        });
-
-        setIncorrectWords(wrongWordIndexes);
-        setCorrectWords(correctWordIndexes);
-
-
-
-
-
-
-      } catch (error) {
-        console.error("Analysis failed", error);
-        toast.error("Lỗi khi phân tích giọng nói.");
-      }
-
-    } else {
-      // Start recording
-      setTranscript('');
-      setIncorrectWords([]);
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current?.start();
-          setIsRecording(true);
-        } catch {
-          toast.error("Không thể bắt đầu ghi âm.");
-        }
-
-      }
-    }
-  };
-
-  const handleReset = () => {
-    // Stop recording safely
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.onend = null;
-        recognitionRef.current.stop();
-      } catch (e) {
-        console.warn('Recognition already stopped');
-      }
-    }
-
-    // Reset states
-    setIsRecording(false);
-    setSeconds(0);
-    setCurrentWordIndex(-1);
-
-    setIncorrectWords([]);
-    setCorrectWords([]);
-
-    setTranscript('');
-  };
-
-
-  // Get background color for a word
-  const getWordBackground = (index: number) => {
-    if (incorrectWords.includes(index)) {
-      return '#FAD4D4'; // đỏ – sai
-    }
-    if (correctWords.includes(index)) {
-      return '#C9F6C9'; // xanh – đúng
-    }
-    if (index === currentWordIndex) {
-      return '#E0F2FE'; // xanh nhạt khi đang đọc
-    }
-    return 'transparent';
-  };
-
-
-  const handleQuickSettingsToggle = () => {
-    if (!isQuickSettingsOpen && !isSidebarCollapsed) {
-      // Opening quick settings - collapse left sidebar
-      onToggleCollapse?.();
-    }
-    setIsQuickSettingsOpen(!isQuickSettingsOpen);
-  };
-
   return (
     <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
-      {/* Sidebar */}
       <Sidebar
         activePage="Nói"
         onNavigate={onNavigate}
@@ -297,80 +219,79 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
         onSignOut={onSignOut}
       />
 
-      {/* Main Content */}
       <main className="flex-1 overflow-hidden flex flex-col h-screen">
         <div className="flex-1 flex items-center justify-center px-12 pt-8 pb-4 overflow-hidden">
-          {/* Speaking Content Frame */}
           <div
-            className="w-full max-w-4xl h-full max-h-[calc(100vh-180px)] rounded-[2rem] border-2 shadow-lg p-12 overflow-y-auto relative"
-            style={{
-              backgroundColor: themeColors.cardBackground,
-              borderColor: themeColors.border,
-            }}
+            className="w-full max-w-4xl h-full max-h-[calc(100vh-180px)] rounded-[2rem] border-2 shadow-lg p-12 overflow-y-auto relative flex flex-col"
+            style={{ backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }}
           >
-            {/* Timer Display */}
-            <div
-              className="absolute top-6 right-8 text-[#555555]"
-              style={{
-                fontFamily: 'var(--display-font-family)',
-                fontSize: 'calc(var(--display-font-size) * 0.8)',
-                letterSpacing: 'var(--display-letter-spacing)',
-              }}
-            >
-              {formatTime(seconds)}
+            {/* Header */}
+            <div className="flex justify-between items-start mb-6 shrink-0">
+              <div>
+                <h1 className="text-2xl font-bold mb-2" style={{ color: themeColors.textMain, fontFamily: 'var(--display-font-family)' }}>
+                  {readingTitle}
+                </h1>
+                <p className="text-sm opacity-70" style={{ color: themeColors.textSecondary }}>
+                  Đọc to đoạn văn bản bên dưới.
+                </p>
+              </div>
+              <div className="text-xl font-mono font-medium" style={{ color: themeColors.textSecondary }}>
+                {formatTime(seconds)}
+              </div>
             </div>
 
-            {/* Title */}
-            <h1 className="text-2xl font-bold mb-4" style={{
-              color: themeColors.textMain,
-              fontFamily: 'var(--display-font-family)',
-              fontSize: 'calc(var(--display-font-size) * 1.5)',
-              letterSpacing: 'var(--display-letter-spacing)',
-            }}>{readingTitle}</h1>
-
-            {/* Text with word highlighting */}
+            {/* Content with Highlighting */}
             <div
-              className="text-[#111111] mx-auto"
+              className="flex-1 overflow-y-auto text-lg leading-loose space-x-1"
               style={{
                 fontFamily: 'var(--display-font-family)',
                 fontSize: 'var(--display-font-size)',
                 lineHeight: 'var(--display-line-spacing)',
-                letterSpacing: 'var(--display-letter-spacing)',
-                maxWidth: '66ch',
-                wordSpacing: '0.16em',
+                color: themeColors.textMain
               }}
             >
-              {words.map((word, index) => {
-                // Skip rendering whitespace as separate elements
-                if (word.trim() === '') {
-                  return word;
-                }
+              {words.map((word, idx) => {
+                let bgColor = 'transparent';
+                if (correctWords.includes(idx)) bgColor = '#C9F6C9'; // Green/Success
+                else if (incorrectWords.includes(idx)) bgColor = '#FAD4D4'; // Red/Error
+                else if (idx === currentWordIndex) bgColor = '#E0F2FE'; // Blue/Active
 
                 return (
                   <span
-                    key={index}
-                    className="rounded-md px-1 transition-colors duration-200"
-                    style={{
-                      backgroundColor: getWordBackground(index),
-                    }}
+                    key={idx}
+                    className="inline-block px-1 rounded transition-colors duration-200"
+                    style={{ backgroundColor: bgColor }}
                   >
                     {word}
                   </span>
-                );
+                )
               })}
             </div>
 
-            {/* Live Transcript (Optional, for debugging or user feedback) */}
-            {transcript && (
-              <div className="mt-8 p-4 bg-gray-100 rounded-lg">
-                <h3 className="text-sm font-bold mb-2">Transcript:</h3>
-                <p className="text-sm text-gray-600">{transcript}</p>
-              </div>
-            )}
+            {/* Score / Status Footer */}
+            <div className="mt-6 pt-6 border-t shrink-0 h-32 flex flex-col justify-center" style={{ borderColor: themeColors.border }}>
+              {isAnalyzing ? (
+                <div className="flex items-center gap-3 text-blue-600 animate-pulse">
+                  <div className="h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                  <span>Đang phân tích...</span>
+                </div>
+              ) : finalScore ? (
+                <div className="animate-in fade-in slide-in-from-bottom-2">
+                  <div className="flex items-center gap-4">
+                    <span className="text-4xl font-bold text-green-600">{finalScore.accuracy.toFixed(0)}</span>
+                    <span className="text-lg font-medium text-gray-500">/ 100 điểm</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-gray-400 italic text-center">
+                  {isRecording ? "Đang lắng nghe..." : "Nhấn micro để bắt đầu"}
+                </p>
+              )}
+            </div>
+
           </div>
         </div>
 
-        {/* Toolbar */}
         <div className="pb-6 flex-shrink-0">
           <SpeakingToolbar
             isRecording={isRecording}
@@ -380,10 +301,9 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
         </div>
       </main>
 
-      {/* Quick Settings Drawer */}
       <QuickSettingsDrawer
         isCollapsed={!isQuickSettingsOpen}
-        onToggle={handleQuickSettingsToggle}
+        onToggle={() => setIsQuickSettingsOpen(!isQuickSettingsOpen)}
       />
     </div>
   );

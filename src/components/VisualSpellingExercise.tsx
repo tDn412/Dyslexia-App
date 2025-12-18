@@ -100,10 +100,10 @@ function FeedbackModal({ isCorrect, correctAnswer, onContinue, onExit, themeColo
         <h2
           className="text-center mb-12"
           style={{
-            fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-            fontSize: '38px',
-            lineHeight: '1.3',
-            letterSpacing: '0.14em',
+            fontFamily: 'var(--display-font-family)',
+            fontSize: 'calc(var(--display-font-size) * 1.5)',
+            lineHeight: 'var(--display-line-spacing)',
+            letterSpacing: 'var(--display-letter-spacing)',
             color: themeColors.textMain,
           }}
         >
@@ -128,8 +128,8 @@ function FeedbackModal({ isCorrect, correctAnswer, onContinue, onExit, themeColo
           >
             <span
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '56px',
+                fontFamily: 'var(--display-font-family)',
+                fontSize: 'calc(var(--display-font-size) * 2)',
                 color: '#FFFFFF',
               }}
             >
@@ -202,6 +202,7 @@ export function VisualSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
           // Aggregate all questions from all matching quizzes
           const allQuestions: Question[] = [];
           data.forEach((quiz: any) => {
+            // Check content.questions exists
             if (quiz.content?.questions) {
               allQuestions.push(...quiz.content.questions);
             }
@@ -295,8 +296,8 @@ export function VisualSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
         >
           <span
             style={{
-              fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-              fontSize: '36px',
+              fontFamily: 'var(--display-font-family)',
+              fontSize: 'calc(var(--display-font-size) * 1.4)',
               color: '#FFFFFF',
             }}
           >
@@ -357,10 +358,10 @@ export function VisualSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
               >
                 <span
                   style={{
-                    fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                    fontSize: '48px',
-                    lineHeight: '1.3',
-                    letterSpacing: '0.14em',
+                    fontFamily: 'var(--display-font-family)',
+                    fontSize: 'calc(var(--display-font-size) * 1.8)',
+                    lineHeight: 'var(--display-line-spacing)',
+                    letterSpacing: 'var(--display-letter-spacing)',
                     color: themeColors.textMain,
                   }}
                 >
@@ -391,10 +392,10 @@ export function VisualSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
               >
                 <span
                   style={{
-                    fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                    fontSize: '48px',
-                    lineHeight: '1.3',
-                    letterSpacing: '0.14em',
+                    fontFamily: 'var(--display-font-family)',
+                    fontSize: 'calc(var(--display-font-size) * 1.8)',
+                    lineHeight: 'var(--display-line-spacing)',
+                    letterSpacing: 'var(--display-letter-spacing)',
                     color: themeColors.textMain,
                   }}
                 >

@@ -13,10 +13,10 @@ interface ListenSpellingExerciseProps {
 }
 
 interface Question {
-  id: number;
+  id: number | string;
   word: string;
   syllables: string[][]; // Grouped by syllables: [['c','o','n'], ['c','ò']]
-  letterPool: string[];
+  letterPool: string[]; // Available letters for drag and drop
   audioText: string;
 }
 
@@ -59,16 +59,17 @@ function FeedbackModal({ isCorrect, onContinue, onExit, themeColors }: FeedbackM
               style={{
                 width: '120px',
                 height: '120px',
-                borderRadius: '30px',
-                backgroundColor: '#4CAF50',
+                borderRadius: '50%',
+                backgroundColor: '#22c55e',
+                boxShadow: '0 8px 24px rgba(34, 197, 94, 0.4)',
               }}
             >
-              <Star
+              <Award
                 style={{
-                  width: '70px',
-                  height: '70px',
+                  width: '64px',
+                  height: '64px',
                   color: '#FFFFFF',
-                  fill: '#FFFFFF',
+                  strokeWidth: '3',
                 }}
               />
             </div>
@@ -78,16 +79,17 @@ function FeedbackModal({ isCorrect, onContinue, onExit, themeColors }: FeedbackM
               style={{
                 width: '120px',
                 height: '120px',
-                borderRadius: '30px',
-                backgroundColor: '#FFC0CB',
+                borderRadius: '50%',
+                backgroundColor: '#ef4444',
+                boxShadow: '0 8px 24px rgba(239, 68, 68, 0.4)',
               }}
             >
-              <Award
+              <X
                 style={{
-                  width: '70px',
-                  height: '70px',
+                  width: '64px',
+                  height: '64px',
                   color: '#FFFFFF',
-                  strokeWidth: '2.5',
+                  strokeWidth: '3',
                 }}
               />
             </div>
@@ -95,69 +97,71 @@ function FeedbackModal({ isCorrect, onContinue, onExit, themeColors }: FeedbackM
         </div>
 
         {/* Message */}
-        <h2
-          className="text-center mb-12"
-          style={{
-            fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-            fontSize: '38px',
-            lineHeight: '1.3',
-            letterSpacing: '0.14em',
-            color: themeColors.textMain,
-          }}
-        >
-          {isCorrect ? 'Xuất sắc! Đúng rồi!' : 'Chưa đúng rồi. Thử lại nhé!'}
-        </h2>
-
-        {/* Action Buttons */}
-        <div className="flex gap-6 justify-center">
-          {/* Continue Button (O) */}
-          <button
-            onClick={onContinue}
-            className="flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95"
-            style={{
-              width: '90px',
-              height: '90px',
-              borderRadius: '20px',
-              backgroundColor: '#4CAF50',
-              boxShadow: `0 4px 12px ${themeColors.shadow}`,
-            }}
+        <div className="text-center mb-8">
+          <h3
+            className="text-4xl font-bold mb-4"
+            style={{ color: themeColors.textMain }}
           >
-            <span
-              style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '56px',
-                color: '#FFFFFF',
-              }}
-            >
-              O
-            </span>
-          </button>
+            {isCorrect ? 'Tuyệt vời!' : 'Thử lại nhé!'}
+          </h3>
+          <p
+            className="text-xl"
+            style={{ color: themeColors.textSecondary }}
+          >
+            {isCorrect
+              ? 'Bạn đã ghép đúng từ rồi.'
+              : 'Hãy nghe kỹ và thử ghép lại nhé.'}
+          </p>
+        </div>
 
-          {/* Exit Button (X) */}
+        {/* Buttons */}
+        <div className="flex gap-4 justify-center">
           <button
             onClick={onExit}
-            className="flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95"
+            className="px-8 py-4 rounded-2xl font-bold text-lg transition-transform hover:scale-105 active:scale-95"
             style={{
-              width: '90px',
-              height: '90px',
-              borderRadius: '20px',
-              backgroundColor: '#FFC0CB',
-              boxShadow: `0 4px 12px ${themeColors.shadow}`,
+              backgroundColor: themeColors.background,
+              color: themeColors.textSecondary,
+              boxShadow: themeColors.pressedParams,
             }}
           >
-            <X
-              style={{
-                width: '48px',
-                height: '48px',
-                color: '#FFFFFF',
-                strokeWidth: '3',
-              }}
-            />
+            Thoát
+          </button>
+          <button
+            onClick={onContinue}
+            className="px-8 py-4 rounded-2xl font-bold text-lg transition-transform hover:scale-105 active:scale-95 flex items-center gap-2"
+            style={{
+              backgroundColor: themeColors.accentMain,
+              color: themeColors.textMain,
+              boxShadow: `0 4px 12px ${themeColors.accentMain}66`,
+            }}
+          >
+            Tiếp tục
+          </button>
+        </div>
+
+        {/* Close Button */}
+        <div className="absolute top-6 right-6">
+          <button
+            onClick={onExit}
+            className="p-2 rounded-full transition-colors hover:bg-black/5"
+            style={{ color: themeColors.textSecondary }}
+          >
+            <X size={32} />
           </button>
         </div>
       </motion.div>
     </motion.div>
   );
+}
+
+// Helper to shuffle array
+function shuffleArray(array: any[]) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
 }
 
 export function ListenSpellingExercise({ onNavigate, onSignOut, isSidebarCollapsed, onToggleCollapse }: ListenSpellingExerciseProps) {
@@ -186,10 +190,54 @@ export function ListenSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
         const data = await fetchQuizzes('listen_spelling');
 
         if (data && data.length > 0) {
+          console.log('Fetched Data:', data);
           const allQuestions: Question[] = [];
+
+          const processQuestion = (q: any, list: Question[]) => {
+            // Generate syllables if missing
+            let syllables = q.syllables;
+            if (!syllables && q.word) {
+              const words = q.word.trim().split(/\s+/);
+              syllables = words.map((w: string) => w.split(''));
+            }
+
+            // Generate letterPool if missing
+            let letterPool = q.letterPool;
+            if (!letterPool && syllables) {
+              // Flatten syllables to get all chars
+              const chars = syllables.flat();
+              // Add some distractors? Or just shuffle
+              letterPool = shuffleArray([...chars]);
+            }
+
+            if (q.word && syllables && letterPool) {
+              list.push({
+                id: q.id || Math.random(),
+                word: q.word,
+                syllables: syllables,
+                letterPool: letterPool,
+                audioText: q.audioText || q.word
+              });
+            }
+          };
+
           data.forEach((quiz: any) => {
-            if (quiz.content?.questions) {
-              allQuestions.push(...quiz.content.questions);
+            console.log('Processing Item:', quiz);
+            let qContent: any = null;
+
+            // Normalize content structure
+            // If the row 'content' is the question itself (matches DB screenshot)
+            if (quiz.content && quiz.content.word) {
+              qContent = { ...quiz.content };
+              // Ensure ID is present from row if not in content
+              if (!qContent.id) qContent.id = quiz.id;
+              processQuestion(qContent, allQuestions);
+            }
+            // If 'content' has a 'questions' array (nested structure)
+            else if (quiz.content && quiz.content.questions && Array.isArray(quiz.content.questions)) {
+              quiz.content.questions.forEach((q: any) => {
+                processQuestion(q, allQuestions);
+              });
             }
           });
 
@@ -231,23 +279,14 @@ export function ListenSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
   const playAudio = async () => {
     setIsPlayingAudio(true);
     try {
-      // Use Google Cloud TTS via our backend
-      const response = await api.tts.speak(currentQuestion.audioText);
-      if (response.data && response.data.audioContent) {
-        const audio = new Audio(`data:audio/mp3;base64,${response.data.audioContent}`);
-        audio.play();
-        audio.onended = () => setIsPlayingAudio(false);
-      } else {
-        throw new Error('No audio content received');
-      }
+      // Use shared textToSpeech utility which respects global settings (voice, speed)
+      await import('../utils/textToSpeech').then(m => m.speakText({
+        text: currentQuestion.audioText,
+        onEnded: () => setIsPlayingAudio(false)
+      }));
     } catch (error) {
       console.error('TTS Error:', error);
-      // Fallback to browser TTS
-      const utterance = new SpeechSynthesisUtterance(currentQuestion.audioText);
-      utterance.lang = 'vi-VN';
-      utterance.rate = 0.8;
-      utterance.onend = () => setIsPlayingAudio(false);
-      window.speechSynthesis.speak(utterance);
+      setIsPlayingAudio(false);
     }
   };
 
@@ -454,8 +493,8 @@ export function ListenSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
           >
             <span
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '36px',
+                fontFamily: 'var(--display-font-family)',
+                fontSize: 'calc(var(--display-font-size) * 1.4)',
                 color: '#FFFFFF',
               }}
             >
@@ -574,10 +613,10 @@ export function ListenSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
                             draggable
                             onDragStart={() => handleDragStart(letter, false, slotIndex)}
                             style={{
-                              fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                              fontSize: '52px',
+                              fontFamily: 'var(--display-font-family)',
+                              fontSize: 'calc(var(--display-font-size) * 2)',
                               lineHeight: '1',
-                              letterSpacing: '0.02em',
+                              letterSpacing: 'var(--display-letter-spacing)',
                               color: themeColors.textMain,
                               cursor: 'grab',
                             }}
@@ -622,8 +661,8 @@ export function ListenSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
                 >
                   <span
                     style={{
-                      fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                      fontSize: '48px',
+                      fontFamily: 'var(--display-font-family)',
+                      fontSize: 'calc(var(--display-font-size) * 1.8)',
                       lineHeight: '1',
                       color: themeColors.textMain,
                     }}
@@ -648,9 +687,9 @@ export function ListenSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
                   padding: '20px 60px',
                   boxShadow: `0 6px 20px ${themeColors.shadow}`,
                   border: 'none',
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                  fontSize: '32px',
-                  letterSpacing: '0.12em',
+                  fontFamily: 'var(--display-font-family)',
+                  fontSize: 'calc(var(--display-font-size) * 1.2)',
+                  letterSpacing: 'var(--display-letter-spacing)',
                 }}
               >
                 Kiểm tra

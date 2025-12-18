@@ -56,27 +56,14 @@ export const api = {
 
     // Text-to-Speech
     tts: {
-        speak: (text: string) =>
+        speak: (text: string, voice?: string, speed?: number) =>
             request<{ audioContent: string }>('/tts', {
                 method: 'POST',
-                body: JSON.stringify({ text }),
+                body: JSON.stringify({ text, voice, speed }),
             }, AI_API_URL),
     },
 
-    // Pronunciation
-    pronunciation: {
-        check: (referenceText: string, audioFile: Blob) => {
-            const formData = new FormData();
-            formData.append('reference_text', referenceText);
-            formData.append('audio_file', audioFile);
 
-            return request<{ reference_text: string; your_transcript: string; word_scores: { word: string; pronunciation_score: number }[] }>('/check-pronunciation', {
-                method: 'POST',
-                body: formData,
-                headers: {}, // Let browser set Content-Type for FormData
-            }, AI_API_URL);
-        },
-    },
 
     // OCR
     ocr: {
@@ -143,6 +130,18 @@ export async function saveSettings(userId: string, settings: any) {
     return response.json();
 }
 
+export async function fetchDashboardRecentReading(userId: string) {
+    const response = await fetch(`${API_URL}/dashboard/recent-reading?userId=${userId}`);
+    if (!response.ok) throw new Error('Failed to fetch recent reading');
+    return response.json();
+}
+
+export async function fetchDashboardNewWords(userId: string, limit: number = 3) {
+    const response = await fetch(`${API_URL}/dashboard/new-words?userId=${userId}&limit=${limit}`);
+    if (!response.ok) throw new Error('Failed to fetch new words');
+    return response.json();
+}
+
 export async function uploadOCR(userId: string, fileName: string, fileData: string, fileType: string) {
     const response = await fetch(`${API_URL}/ocr/upload`, {
         method: 'POST',
@@ -165,15 +164,7 @@ export async function fetchOCRFileById(userId: string, id: string) {
     return response.json();
 }
 
-export async function analyzeSpeaking(userId: string, textId: string, referenceText: string, transcript: string) {
-    const response = await fetch(`${API_URL}/speakings/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, textId, referenceText, transcript }),
-    });
-    if (!response.ok) throw new Error('Failed to analyze speaking');
-    return response.json();
-}
+
 
 export async function fetchQuizzes(type?: string) {
     const url = type ? `${API_URL}/quizzes?skill=${type}` : `${API_URL}/quizzes`;
@@ -220,6 +211,19 @@ export async function register(userData: any) {
     if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Registration failed');
+    }
+    return response.json();
+}
+
+export async function saveReadingProgress(userId: string, readingId: string) {
+    const response = await fetch(`${API_URL}/readings/${readingId}/progress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(error.error || error.message || 'Failed to save reading progress');
     }
     return response.json();
 }

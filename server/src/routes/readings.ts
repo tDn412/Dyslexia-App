@@ -49,6 +49,35 @@ router.get('/:id', async (req, res) => {
   res.json(data);
 });
 
+// ---------------- RECORD PROGRESS ------------------
+router.post('/:id/progress', async (req, res) => {
+  const { userId } = req.body;
+  const contentRefId = req.params.id;
+
+  if (!userId) return res.status(400).json({ error: 'userId is required' });
+
+  // Insert into ReadingProgress
+  const { data, error } = await supabase
+    .from('ReadingProgress')
+    .insert([
+      {
+        userid: userId,
+        contentrefid: contentRefId,
+        type: 'text',
+        progresspercent: 100
+      }
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error saving progress:", error);
+    return res.status(500).json(error);
+  }
+
+  res.status(201).json(data);
+});
+
 // ---------------- CREATE ------------------
 router.post('/', async (req, res) => {
   const { title, topic, level, content, userId } = req.body;

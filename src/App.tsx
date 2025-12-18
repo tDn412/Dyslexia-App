@@ -1,6 +1,6 @@
 import { BookOpen, Mic, ArrowRight } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
 import { ReadingPage } from './components/ReadingPage';
@@ -42,6 +42,36 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport' | 'Exercise' | 'QuizPlayer' | 'VisualSpelling' | 'ListenSpelling' | 'ReadingComprehension' | 'ClozeTest'>('Home');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  // Dynamic data state
+  const [recentReading, setRecentReading] = useState<{ title: string; preview: string; materialId: string | null } | null>(null);
+  const [newWords, setNewWords] = useState<{ word: string; definition: string }[]>([]);
+
+  // Fetch dashboard data
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      // Use logged in user ID or fallback
+      const currentUserId = user?.id || 'dbe2f7eb-4b2f-49d0-a7fa-b6fb5a5a0ab2';
+
+      try {
+        // 1. Fetch Recent Reading
+        const readingData = await import('./utils/api').then(m => m.fetchDashboardRecentReading(currentUserId));
+        if (readingData) {
+          setRecentReading(readingData);
+        }
+
+        // 2. Fetch New Words
+        const wordsData = await import('./utils/api').then(m => m.fetchDashboardNewWords(currentUserId, 3));
+        if (wordsData && Array.isArray(wordsData)) {
+          setNewWords(wordsData);
+        }
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      }
+    };
+
+    loadDashboardData();
+  }, [user, currentPage]);
+
   const handleLogin = (userData: any) => {
     setIsAuthenticated(true);
     setUser(userData);
@@ -82,13 +112,14 @@ function AppContent() {
 
   // Helper function to map currentPage to activePage name for sidebar
   const getActivePage = () => {
-    if (currentPage === 'ReadingSelection' || currentPage === 'Reading') return 'Đọc';
-    if (currentPage === 'SpeakingSelection' || currentPage === 'Speaking') return 'Nói';
-    if (currentPage === 'Library') return 'Thư viện';
-    if (currentPage === 'OCRImport') return 'Nhập OCR';
-    if (currentPage === 'SettingsOverview' || currentPage === 'DisplaySettings' || currentPage === 'AudioSettings') return 'Cài đặt';
-    if (currentPage === 'Exercise' || currentPage === 'QuizPlayer' || currentPage === 'VisualSpelling' || currentPage === 'ListenSpelling' || currentPage === 'ReadingComprehension' || currentPage === 'ClozeTest') return 'Bài tập';
-    return 'Trang chủ';
+    // console.log('App Debug: currentPage =', currentPage);
+    if (currentPage === 'ReadingSelection' || currentPage === 'Reading') return 'ReadingSelection';
+    if (currentPage === 'SpeakingSelection' || currentPage === 'Speaking') return 'SpeakingSelection';
+    if (currentPage === 'Library') return 'Library';
+    if (currentPage === 'OCRImport') return 'OCRImport';
+    if (currentPage === 'SettingsOverview' || currentPage === 'DisplaySettings' || currentPage === 'AudioSettings') return 'SettingsOverview';
+    if (currentPage === 'Exercise' || currentPage === 'QuizPlayer' || currentPage === 'VisualSpelling' || currentPage === 'ListenSpelling' || currentPage === 'ReadingComprehension' || currentPage === 'ClozeTest') return 'Exercise';
+    return 'Home';
   };
 
   const commonProps = {
@@ -159,16 +190,6 @@ function AppContent() {
     return <ClozeTestExercise {...commonProps} />;
   }
 
-  // Sample data for the reading preview
-  const readingPreview = "Con bướm đáp nhẹ nhàng trên bông hoa đầy màu sắc. Đôi cánh của nó có màu cam và đen tươi sáng...";
-
-  // Sample new words from the library
-  const newWords = [
-    { word: "bướm", definition: "côn trùng có cánh" },
-    { word: "nhẹ nhàng", definition: "mềm mại và cẩn thận" },
-    { word: "màu sắc", definition: "có nhiều màu" },
-  ];
-
   return (
     <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
       {/* Sidebar */}
@@ -178,6 +199,7 @@ function AppContent() {
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onSignOut={handleSignOut}
+        user={user}
       />
 
       {/* Main Content */}
@@ -224,7 +246,7 @@ function AppContent() {
                   color: themeColors.textMain,
                 }}
               >
-                Đọc lại
+                Đọc lại: {recentReading?.title || "Chưa có bài đọc"}
               </h2>
 
               {/* Content Box */}
@@ -237,12 +259,16 @@ function AppContent() {
                     lineHeight: 'var(--display-line-spacing)',
                     letterSpacing: 'var(--display-letter-spacing)',
                     color: themeColors.textMain,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
                   }}
                 >
-                  {readingPreview}
+                  {recentReading?.preview || "Hãy chọn một bài đọc từ danh sách để bắt đầu."}
                 </p>
                 <button
-                  onClick={() => setCurrentPage('ReadingSelection')}
+                  onClick={() => setCurrentPage(recentReading?.materialId ? 'Reading' : 'ReadingSelection')}
                   className="flex items-center gap-3 hover:opacity-70 transition-colors"
                   style={{
                     fontFamily: 'var(--display-font-family)',
@@ -252,7 +278,7 @@ function AppContent() {
                     color: themeColors.textMain,
                   }}
                 >
-                  <span>Tiếp tục</span>
+                  <span>{recentReading?.materialId ? "Tiếp tục" : "Khám phá ngay"}</span>
                   <svg className="w-[24px] h-[24px]" fill="none" viewBox="0 0 23 23">
                     <g>
                       <path d="M4.6875 11.25H17.8125" stroke={themeColors.textMain} strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.875" />
@@ -349,25 +375,35 @@ function AppContent() {
 
             {/* Words Carousel */}
             <div className="flex gap-6">
-              {newWords.map((item, index) => (
-                <div
-                  key={index}
-                  className="rounded-[27px] border-2 flex-1 h-[120px] flex items-center justify-center px-9 py-7"
-                  style={{ backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }}
-                >
-                  <p
-                    style={{
-                      fontFamily: 'var(--display-font-family)',
-                      fontSize: 'calc(var(--display-font-size) * 1.15)',
-                      lineHeight: 'var(--display-line-spacing)',
-                      letterSpacing: 'var(--display-letter-spacing)',
-                      color: themeColors.textMain,
-                    }}
+              {newWords.length > 0 ? (
+                newWords.map((item, index) => (
+                  <div
+                    key={index}
+                    className="rounded-[27px] border-2 flex-1 h-[120px] flex items-center justify-center px-9 py-7 transition-all hover:scale-105 cursor-pointer"
+                    style={{ backgroundColor: themeColors.cardBackground, borderColor: themeColors.border }}
+                    onClick={() => setCurrentPage('Library')}
                   >
-                    {item.word}
-                  </p>
+                    <p
+                      style={{
+                        fontFamily: 'var(--display-font-family)',
+                        fontSize: 'calc(var(--display-font-size) * 1.15)',
+                        lineHeight: 'var(--display-line-spacing)',
+                        letterSpacing: 'var(--display-letter-spacing)',
+                        color: themeColors.textMain,
+                      }}
+                    >
+                      {item.word}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div
+                  className="rounded-[27px] border-2 flex-1 h-[120px] flex items-center justify-center border-dashed"
+                  style={{ borderColor: themeColors.border }}
+                >
+                  <p style={{ fontFamily: 'var(--display-font-family)', color: themeColors.textSecondary }}>Chưa có từ mới nào</p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>

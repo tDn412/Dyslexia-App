@@ -13,6 +13,7 @@ interface AudioSettingsPageProps {
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onSignOut?: () => void;
+  userId?: string;
 }
 
 const maleVoices = [
@@ -27,11 +28,11 @@ const femaleVoices = [
   { id: 'female-3', label: 'Nữ 3', name: 'Vietnamese Female Voice 3' },
 ];
 
-export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onToggleCollapse, onSignOut }: AudioSettingsPageProps) {
+export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onToggleCollapse, onSignOut, userId = 'dbe2f7eb-4b2f-49d0-a7fa-b6fb5a5a0ab2' }: AudioSettingsPageProps) {
   const { themeColors } = useTheme();
   const [selectedVoice, setSelectedVoice] = useState('male-1');
   const [readingSpeed, setReadingSpeed] = useState(1.0);
-  const previewText = "Nội dung nghe thử";
+  const [previewText, setPreviewText] = useState("Nội dung nghe thử");
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -58,7 +59,6 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
     }
 
     try {
-      const userId = 'demo-user-id';
       await saveSettings(userId, {
         audio: {
           voice: selectedVoice,
@@ -85,8 +85,13 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
     const voice = voiceId || selectedVoice;
     console.log('Playing preview with voice:', voice, 'Text:', previewText, 'Speed:', readingSpeed);
 
+    if (!previewText.trim()) {
+      toast.error("Vui lòng nhập nội dung nghe thử");
+      return;
+    }
+
     try {
-      await speakText({ text: previewText, rate: readingSpeed });
+      await speakText({ text: previewText, rate: readingSpeed, voice: voice });
     } catch (error) {
       console.error('Preview error:', error);
       toast.error('Không thể phát âm thanh mẫu');
@@ -152,29 +157,32 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
                   color: themeColors.textMain,
                 }}
               >
-                Nghe thử
+                Nghe thử (tối đa 50 ký tự)
               </label>
               <div
-                className="rounded-2xl border-2 p-5 flex items-center justify-between"
+                className="rounded-2xl border-2 p-2 pl-4 flex items-center justify-between"
                 style={{
                   backgroundColor: themeColors.accentMain,
                   borderColor: themeColors.border,
+                  minHeight: '80px'
                 }}
               >
-                <p
+                <Input
+                  value={previewText}
+                  onChange={(e) => setPreviewText(e.target.value.slice(0, 50))}
+                  placeholder="Nhập nội dung để nghe thử..."
+                  className="flex-1 border-none bg-transparent shadow-none focus-visible:ring-0 text-lg h-auto p-0"
                   style={{
                     fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
                     fontSize: '20px',
-                    letterSpacing: '0.14em',
-                    lineHeight: '1.8',
+                    letterSpacing: '0.05em',
                     color: themeColors.textMain,
                   }}
-                >
-                  {previewText}
-                </p>
+                />
+
                 <button
                   onClick={() => playPreview()}
-                  className="ml-6 w-11 h-11 rounded-xl border-2 flex items-center justify-center transition-all shadow-sm hover:shadow-md flex-shrink-0"
+                  className="ml-4 mr-2 w-11 h-11 rounded-xl border-2 flex items-center justify-center transition-all shadow-sm hover:shadow-md flex-shrink-0"
                   style={{
                     backgroundColor: '#D4E7F5',
                     borderColor: '#B8D4E8',
@@ -218,11 +226,11 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
                 </div>
                 <Input
                   type="number"
-                  value={readingSpeed.toFixed(2)}
+                  value={readingSpeed}
                   onChange={(e) => setReadingSpeed(Number(e.target.value))}
                   min={0.5}
                   max={2.0}
-                  step={0.05}
+                  step={0.1}
                   className="w-20 text-center border-2 rounded-xl h-11"
                   style={{
                     fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",

@@ -7,7 +7,7 @@ import { ScrollableTopics } from './ScrollableTopics';
 import { fetchReadings } from '../utils/api';
 
 interface ReadingSelectionPageProps {
-  onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport') => void;
+  onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'AudioSettings' | 'OCRImport' | 'Exercise' | 'QuizPlayer' | 'VisualSpelling' | 'ListenSpelling' | 'ReadingComprehension' | 'ClozeTest') => void;
   onSignOut?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -53,8 +53,9 @@ export function ReadingSelectionPage({ onNavigate, onSignOut, isSidebarCollapsed
   }, [selectedLevel, selectedTopic, searchQuery]);
 
   const handleReadingClick = (id: string) => {
-    // Store selected reading ID in localStorage or context to pass to ReadingPage
+    // Store selected reading ID and list for navigation
     localStorage.setItem('currentReadingId', id);
+    localStorage.setItem('readingList', JSON.stringify(readings.map(r => r.textid || r.id)));
     if (onNavigate) {
       onNavigate('Reading');
     }
@@ -105,7 +106,7 @@ export function ReadingSelectionPage({ onNavigate, onSignOut, isSidebarCollapsed
 
           {/* Level Filter */}
           <div className="mb-8">
-            <div className="flex gap-4 flex-wrap">
+            <div className="flex gap-4 flex-wrap justify-center">
               {levels.map((level) => (
                 <button
                   key={level}

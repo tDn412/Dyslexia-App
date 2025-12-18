@@ -16,6 +16,9 @@ export interface SpeakOptions {
     volume?: number;
     voice?: string;
     onWordBoundary?: (wordIndex: number) => void; // Callback for word highlighting
+    onTimeUpdate?: (currentTime: number) => void;
+    onEnded?: () => void;
+    onDuration?: (duration: number) => void;
 }
 
 /**
@@ -26,28 +29,61 @@ export const speakText = async (options: SpeakOptions): Promise<void> => {
         // Stop any currently playing audio
         stopSpeaking();
 
-        const { text } = options;
+        const { text, onTimeUpdate, onEnded, onDuration } = options;
 
         if (!text.trim()) {
             return;
         }
 
-        // Call API to get audio from Google Cloud TTS
-        const response = await api.tts.speak(text);
+        // Get settings from LocalStorage or use defaults
+        let preferredVoice = 'female-1';
+        let readingSpeed = 1.0;
 
-        if (response.error || !response.data?.audio_base64) {
+        if (typeof window !== 'undefined') {
+            const savedVoice = localStorage.getItem('audio-preferred-voice');
+            const savedSpeed = localStorage.getItem('audio-reading-speed');
+            if (savedVoice) preferredVoice = savedVoice;
+            if (savedSpeed) readingSpeed = parseFloat(savedSpeed);
+        }
+
+        // Allow options to override global settings (e.g. for Preview)
+        if (options.voice) preferredVoice = options.voice;
+        if (options.rate) readingSpeed = options.rate;
+
+        // Call API to get audio from Google Cloud TTS
+        const response = await api.tts.speak(text, preferredVoice, readingSpeed);
+
+        if (response.error || !response.data?.audioContent) {
             throw new Error(response.error || 'Failed to generate speech');
         }
 
         // Decode base64 and play
-        const audioSrc = `data:audio/mp3;base64,${response.data.audio_base64}`;
+        const audioSrc = `data:audio/mp3;base64,${response.data.audioContent}`;
         const audio = new Audio(audioSrc);
+        audio.playbackRate = 1.0; // We handle speed at generation time for higher quality, but can fallback to this if needed.
+        // Note: Google TTS handles speed in generation, so audio comes back at correct speed.
+        // Setting playbackRate on audio element would apply speed *on top* of generated speed.
+        // So we keep it 1.0 here unless we want to support dynamic speed change without re-requesting.
+
+        // Attach event listeners
+        if (onTimeUpdate) {
+            audio.ontimeupdate = () => {
+                onTimeUpdate(audio.currentTime);
+            };
+        }
+
+        if (onDuration) {
+            audio.onloadedmetadata = () => {
+                onDuration(audio.duration);
+            };
+        }
 
         currentAudio = audio;
 
         return new Promise((resolve, reject) => {
             audio.onended = () => {
                 currentAudio = null;
+                if (onEnded) onEnded();
                 resolve();
             };
 

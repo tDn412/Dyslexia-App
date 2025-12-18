@@ -17,10 +17,12 @@ interface SidebarProps {
   onNavigate?: (page: 'Home' | 'Reading' | 'ReadingSelection' | 'Speaking' | 'SpeakingSelection' | 'Library' | 'SettingsOverview' | 'DisplaySettings' | 'OCRImport' | 'Exercise') => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+
   onSignOut?: () => void;
+  user?: any;
 }
 
-export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleCollapse, onSignOut }: SidebarProps) {
+export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleCollapse, onSignOut, user }: SidebarProps) {
   const { themeColors } = useTheme();
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
   const menuItems = [
@@ -56,7 +58,7 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
           <nav className="flex-1 p-2">
             <ul className="space-y-2">
               {menuItems.map((item) => {
-                const isActive = activePage === item.name;
+                const isActive = activePage === item.page || activePage === item.name;
                 const Icon = item.icon;
 
                 return (
@@ -168,18 +170,8 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
                 color: themeColors.textMain,
               }}
             >
-              Sam Anderson
+              {user?.username || "Guest"}
             </h3>
-            <p
-              style={{
-                fontFamily: 'var(--display-font-family)',
-                fontSize: 'calc(var(--display-font-size) * 0.7)',
-                letterSpacing: 'var(--display-letter-spacing)',
-                color: themeColors.textMuted,
-              }}
-            >
-              Cấp độ 3
-            </p>
           </div>
         </div>
       </div>
@@ -188,7 +180,7 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
       <nav className="flex-1 p-4 overflow-y-auto min-h-0">
         <ul className="space-y-2">
           {menuItems.map((item) => {
-            const isActive = activePage === item.name;
+            const isActive = activePage === item.page || activePage === item.name;
             const Icon = item.icon;
 
             return (

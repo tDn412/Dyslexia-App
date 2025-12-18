@@ -188,8 +188,8 @@ export function ClozeTestExercise({ onNavigate, onSignOut, isSidebarCollapsed, o
 
         if (data && data.length > 0) {
           const fetchedExercises: Exercise[] = data.map((quiz: any) => ({
-            id: quiz.quizid,
-            title: quiz.title,
+            id: quiz.content?.id || quiz.id,
+            title: quiz.content?.title || 'Bài tập điền từ',
             questions: quiz.content?.questions || [],
           }));
 
@@ -350,11 +350,11 @@ export function ClozeTestExercise({ onNavigate, onSignOut, isSidebarCollapsed, o
           <h1
             className="mb-12"
             style={{
-              fontFamily: "'Lexend', sans-serif",
-              fontSize: '42px',
+              fontFamily: 'var(--display-font-family)',
+              fontSize: 'calc(var(--display-font-size) * 1.6)',
               fontWeight: '500',
-              lineHeight: '1.5',
-              letterSpacing: '0.12em',
+              lineHeight: 'var(--display-line-spacing)',
+              letterSpacing: 'var(--display-letter-spacing)',
               color: themeColors.textMain,
             }}
           >
@@ -379,10 +379,10 @@ export function ClozeTestExercise({ onNavigate, onSignOut, isSidebarCollapsed, o
               >
                 <h2
                   style={{
-                    fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                    fontSize: '32px',
-                    lineHeight: '1.3',
-                    letterSpacing: '0.14em',
+                    fontFamily: 'var(--display-font-family)',
+                    fontSize: 'calc(var(--display-font-size) * 1.2)',
+                    lineHeight: 'var(--display-line-spacing)',
+                    letterSpacing: 'var(--display-letter-spacing)',
                     color: themeColors.textMain,
                   }}
                 >
@@ -513,13 +513,20 @@ export function ClozeTestExercise({ onNavigate, onSignOut, isSidebarCollapsed, o
                     const blank = segment;
                     const isIncorrect = showHint && incorrectBlanks.includes(blank.id);
                     const isCheckedWrong = hasChecked && filledBlanks[blank.id] !== blank.correctAnswer;
+                    const isCheckedCorrect = hasChecked && filledBlanks[blank.id] === blank.correctAnswer;
 
                     let backgroundColor = 'transparent';
                     let borderColor = themeColors.border;
+                    let textColor = themeColors.textMain;
 
                     if (isIncorrect || isCheckedWrong) {
                       backgroundColor = '#FFE9ED';
-                      borderColor = '#FFC0CB';
+                      borderColor = '#FF6B6B';
+                      textColor = '#FF6B6B';
+                    } else if (isCheckedCorrect) {
+                      backgroundColor = '#E8F5E9'; // Light Green
+                      borderColor = '#4CAF50';     // Green
+                      textColor = '#2E7D32';       // Dark Green
                     } else if (filledBlanks[blank.id]) {
                       backgroundColor = themeColors.accentMain;
                     }
@@ -669,9 +676,9 @@ export function ClozeTestExercise({ onNavigate, onSignOut, isSidebarCollapsed, o
                     padding: '18px 40px',
                     boxShadow: `0 6px 20px ${themeColors.shadow}`,
                     border: 'none',
-                    fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                    fontSize: '28px',
-                    letterSpacing: '0.12em',
+                    fontFamily: 'var(--display-font-family)',
+                    fontSize: 'calc(var(--display-font-size) * 1.1)',
+                    letterSpacing: 'var(--display-letter-spacing)',
                     cursor: allBlanksFilled ? 'pointer' : 'not-allowed',
                     opacity: allBlanksFilled ? 1 : 0.5,
                   }}
@@ -679,7 +686,7 @@ export function ClozeTestExercise({ onNavigate, onSignOut, isSidebarCollapsed, o
                   Kiểm tra
                 </button>
               ) : (
-                <div>
+                <div className="flex flex-col w-full gap-4">
                   {allCorrect ? (
                     <button
                       onClick={handleContinue}
@@ -691,22 +698,23 @@ export function ClozeTestExercise({ onNavigate, onSignOut, isSidebarCollapsed, o
                         padding: '18px 40px',
                         boxShadow: `0 6px 20px ${themeColors.shadow}`,
                         border: 'none',
-                        fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                        fontSize: '28px',
-                        letterSpacing: '0.12em',
+                        fontFamily: 'var(--display-font-family)',
+                        fontSize: 'calc(var(--display-font-size) * 1.1)',
+                        letterSpacing: 'var(--display-letter-spacing)',
+                        width: '100%',
                       }}
                     >
                       Câu tiếp theo
                     </button>
                   ) : (
-                    <div>
+                    <div className="flex flex-col w-full gap-4">
                       <p
-                        className="mb-4"
+                        className="mb-0 text-center"
                         style={{
-                          fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                          fontSize: '24px',
+                          fontFamily: 'var(--display-font-family)',
+                          fontSize: 'var(--display-font-size)',
                           color: '#FF6B6B',
-                          letterSpacing: '0.12em',
+                          letterSpacing: 'var(--display-letter-spacing)',
                         }}
                       >
                         Chưa chính xác, bé thử lại nhé
@@ -721,9 +729,10 @@ export function ClozeTestExercise({ onNavigate, onSignOut, isSidebarCollapsed, o
                           padding: '18px 40px',
                           boxShadow: `0 6px 20px ${themeColors.shadow}`,
                           border: 'none',
-                          fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                          fontSize: '28px',
-                          letterSpacing: '0.12em',
+                          fontFamily: 'var(--display-font-family)',
+                          fontSize: 'calc(var(--display-font-size) * 1.1)',
+                          letterSpacing: 'var(--display-letter-spacing)',
+                          width: '100%',
                         }}
                       >
                         Thử lại

@@ -39,14 +39,12 @@ else:
 print("Đang khởi tạo các Google Cloud Clients...")
 try:
     tts_client = texttospeech.TextToSpeechClient()
-    speech_client = speech.SpeechClient()
+    # speech_client removed as we switched to local evaluation
     vision_client = vision.ImageAnnotatorClient()
     print("Đã khởi tạo xong Google Cloud Clients.")
 except Exception as e:
     print(f"LỖI KHI KHỞI TẠO GOOGLE CLIENTS: {e}")
-    # Nếu không khởi tạo được, các API sẽ lỗi, nhưng app vẫn chạy để debug
     tts_client = None
-    speech_client = None
     vision_client = None
 
 
@@ -65,6 +63,8 @@ app.add_middleware(
 # Định nghĩa kiểu dữ liệu Input cho các hàm cần text
 class TextRequest(BaseModel):
     text: str
+    voice: str = "female-1" # Default voice ID
+    speed: float = 1.0    # Default speed
 
 @app.get("/")
 def read_root():
@@ -92,84 +92,38 @@ async def text_to_speech_gcp(request: TextRequest):
         raise HTTPException(status_code=500, detail="Lỗi: Dịch vụ TTS chưa được khởi tạo.")
     try:
         synthesis_input = texttospeech.SynthesisInput(text=request.text)
+        
+        # Mapping voice IDs to Google Cloud TTS voice names
+        voice_map = {
+            "female-1": {"name": "vi-VN-Standard-A", "gender": texttospeech.SsmlVoiceGender.FEMALE},
+            "female-2": {"name": "vi-VN-Standard-C", "gender": texttospeech.SsmlVoiceGender.FEMALE},
+            "female-3": {"name": "vi-VN-Wavenet-C", "gender": texttospeech.SsmlVoiceGender.FEMALE},
+            "male-1":   {"name": "vi-VN-Standard-D", "gender": texttospeech.SsmlVoiceGender.MALE},
+            "male-2":   {"name": "vi-VN-Standard-B", "gender": texttospeech.SsmlVoiceGender.MALE},
+            "male-3":   {"name": "vi-VN-Wavenet-D", "gender": texttospeech.SsmlVoiceGender.MALE},
+        }
+        
+        selected_voice = voice_map.get(request.voice, voice_map["female-1"])
+
         voice = texttospeech.VoiceSelectionParams(
             language_code="vi-VN", 
-            name="vi-VN-Standard-A", # Giọng nữ
-            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
+            name=selected_voice["name"],
+            ssml_gender=selected_voice["gender"]
         )
         audio_config = texttospeech.AudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.MP3
+            audio_encoding=texttospeech.AudioEncoding.MP3,
+            speaking_rate=request.speed
         )
         response = tts_client.synthesize_speech(
             input=synthesis_input, voice=voice, audio_config=audio_config
         )
         # Trả về file âm thanh dưới dạng Base64
         audio_base64 = base64.b64encode(response.audio_content).decode('utf-8')
-        return {"audio_base64": audio_base64}
+        return {"audioContent": audio_base64}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- MODULE 3: KIỂM TRA PHÁT ÂM (Google Speech-to-Text) - FIXED VERSION ---
-@app.post("/api/check-pronunciation")
-async def check_pronunciation_gcp(
-    reference_text: str = Form(...), 
-    audio_file: UploadFile = File(...)
-):
-    if not speech_client:
-        raise HTTPException(status_code=500, detail="Lỗi: Dịch vụ Speech-to-Text chưa được khởi tạo.")
-    try:
-        audio_content = await audio_file.read()
-        audio = speech.RecognitionAudio(content=audio_content)
 
-        # Cấu hình nhận dạng - LƯU Ý: Đảm bảo file âm thanh là WAV (LINEAR16)
-        config = speech.RecognitionConfig(
-            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-            sample_rate_hertz=16000, # Đảm bảo frontend ghi âm ở 16000Hz
-            language_code="vi-VN",
-            enable_automatic_punctuation=True,
-            enable_word_time_offsets=True  # Get word-level timing
-        )
-        
-        response = speech_client.recognize(config=config, audio=audio)
-        
-        if not response.results:
-            return {"error": "Không nhận dạng được giọng nói"}
-
-        result = response.results[0]
-        transcript = result.alternatives[0].transcript
-        
-        # Simple word matching for scoring
-        # Normalize both texts for comparison
-        reference_words = text_normalize(reference_text).lower().split()
-        transcript_words = text_normalize(transcript).lower().split()
-        
-        word_scores = []
-        for i, ref_word in enumerate(reference_words):
-            # Check if word exists in transcript
-            # Give 100 if exact match, 80 if similar, 50 if missing
-            score = 50  # Default: missing
-            
-            if ref_word in transcript_words:
-                score = 100  # Exact match
-            else:
-                # Check for partial match (simple similarity)
-                for trans_word in transcript_words:
-                    if ref_word in trans_word or trans_word in ref_word:
-                        score = 80  # Partial match
-                        break
-            
-            word_scores.append({
-                "word": ref_word,
-                "pronunciation_score": score
-            })
-
-        return {
-            "reference_text": reference_text,
-            "your_transcript": transcript,
-            "word_scores": word_scores
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 # --- MODULE 4: NHẬN DẠNG KÝ TỰ (Google Vision AI) ---
 @app.post("/api/ocr")

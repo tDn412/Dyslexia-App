@@ -81,10 +81,10 @@ function CompletionModal({ onBackToList, themeColors }: CompletionModalProps) {
         <h2
           className="text-center mb-12"
           style={{
-            fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-            fontSize: '38px',
-            lineHeight: '1.3',
-            letterSpacing: '0.14em',
+            fontFamily: 'var(--display-font-family)',
+            fontSize: 'calc(var(--display-font-size) * 1.5)',
+            lineHeight: 'var(--display-line-spacing)',
+            letterSpacing: 'var(--display-letter-spacing)',
             color: themeColors.textMain,
           }}
         >
@@ -103,9 +103,10 @@ function CompletionModal({ onBackToList, themeColors }: CompletionModalProps) {
               padding: '18px 50px',
               boxShadow: `0 6px 20px ${themeColors.shadow}`,
               border: 'none',
-              fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-              fontSize: '28px',
-              letterSpacing: '0.12em',
+              border: 'none',
+              fontFamily: 'var(--display-font-family)',
+              fontSize: 'calc(var(--display-font-size) * 1.1)',
+              letterSpacing: 'var(--display-letter-spacing)',
             }}
           >
             Về danh sách
@@ -166,8 +167,8 @@ export function ReadingComprehensionExercise({ onNavigate, onSignOut, isSidebarC
 
         if (data && data.length > 0) {
           const fetchedExercises: Exercise[] = data.map((quiz: any) => ({
-            id: quiz.quizid,
-            title: quiz.title,
+            id: quiz.content?.id || quiz.id, // Fallback to row ID if content ID missing
+            title: quiz.content?.title || 'Bài tập không tên',
             text: quiz.content?.text || '',
             questions: quiz.content?.questions || [],
           }));
@@ -278,11 +279,11 @@ export function ReadingComprehensionExercise({ onNavigate, onSignOut, isSidebarC
           <h1
             className="mb-12"
             style={{
-              fontFamily: "'Lexend', sans-serif",
-              fontSize: '42px',
+              fontFamily: 'var(--display-font-family)',
+              fontSize: 'calc(var(--display-font-size) * 1.6)',
               fontWeight: '500',
-              lineHeight: '1.5',
-              letterSpacing: '0.12em',
+              lineHeight: 'var(--display-line-spacing)',
+              letterSpacing: 'var(--display-letter-spacing)',
               color: themeColors.textMain,
             }}
           >
@@ -309,10 +310,10 @@ export function ReadingComprehensionExercise({ onNavigate, onSignOut, isSidebarC
                   <div>
                     <h2
                       style={{
-                        fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                        fontSize: '32px',
-                        lineHeight: '1.3',
-                        letterSpacing: '0.14em',
+                        fontFamily: 'var(--display-font-family)',
+                        fontSize: 'calc(var(--display-font-size) * 1.2)',
+                        lineHeight: 'var(--display-line-spacing)',
+                        letterSpacing: 'var(--display-letter-spacing)',
                         color: themeColors.textMain,
                         marginBottom: '8px',
                       }}
@@ -321,10 +322,10 @@ export function ReadingComprehensionExercise({ onNavigate, onSignOut, isSidebarC
                     </h2>
                     <p
                       style={{
-                        fontFamily: "'Lexend', sans-serif",
-                        fontSize: '22px',
-                        lineHeight: '1.5',
-                        letterSpacing: '0.12em',
+                        fontFamily: 'var(--display-font-family)',
+                        fontSize: 'calc(var(--display-font-size) * 0.9)',
+                        lineHeight: 'var(--display-line-spacing)',
+                        letterSpacing: 'var(--display-letter-spacing)',
                         color: themeColors.textSecondary,
                       }}
                     >
@@ -404,10 +405,10 @@ export function ReadingComprehensionExercise({ onNavigate, onSignOut, isSidebarC
               <h2
                 className="mb-6"
                 style={{
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                  fontSize: '32px',
-                  lineHeight: '1.3',
-                  letterSpacing: '0.14em',
+                  fontFamily: 'var(--display-font-family)',
+                  fontSize: 'calc(var(--display-font-size) * 1.2)',
+                  lineHeight: 'var(--display-line-spacing)',
+                  letterSpacing: 'var(--display-letter-spacing)',
                   color: themeColors.textMain,
                 }}
               >
@@ -415,10 +416,10 @@ export function ReadingComprehensionExercise({ onNavigate, onSignOut, isSidebarC
               </h2>
               <p
                 style={{
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                  fontSize: '26px',
-                  lineHeight: '1.8',
-                  letterSpacing: '0.14em',
+                  fontFamily: 'var(--display-font-family)',
+                  fontSize: 'var(--display-font-size)',
+                  lineHeight: 'var(--display-line-spacing)',
+                  letterSpacing: 'var(--display-letter-spacing)',
                   color: themeColors.textMain,
                 }}
               >
@@ -441,10 +442,10 @@ export function ReadingComprehensionExercise({ onNavigate, onSignOut, isSidebarC
               <div
                 className="mb-6"
                 style={{
-                  fontFamily: "'Lexend', sans-serif",
-                  fontSize: '22px',
-                  lineHeight: '1.5',
-                  letterSpacing: '0.12em',
+                  fontFamily: 'var(--display-font-family)',
+                  fontSize: 'calc(var(--display-font-size) * 0.9)',
+                  lineHeight: 'var(--display-line-spacing)',
+                  letterSpacing: 'var(--display-letter-spacing)',
                   color: themeColors.textSecondary,
                 }}
               >
@@ -455,11 +456,11 @@ export function ReadingComprehensionExercise({ onNavigate, onSignOut, isSidebarC
               <h3
                 className="mb-8"
                 style={{
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                  fontSize: '28px',
+                  fontFamily: 'var(--display-font-family)',
+                  fontSize: 'calc(var(--display-font-size) * 1.1)',
                   fontWeight: '600',
-                  lineHeight: '1.4',
-                  letterSpacing: '0.12em',
+                  lineHeight: 'var(--display-line-spacing)',
+                  letterSpacing: 'var(--display-letter-spacing)',
                   color: themeColors.textMain,
                 }}
               >
@@ -516,10 +517,10 @@ export function ReadingComprehensionExercise({ onNavigate, onSignOut, isSidebarC
                     >
                       <span
                         style={{
-                          fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                          fontSize: '24px',
-                          lineHeight: '1.5',
-                          letterSpacing: '0.12em',
+                          fontFamily: 'var(--display-font-family)',
+                          fontSize: 'var(--display-font-size)',
+                          lineHeight: 'var(--display-line-spacing)',
+                          letterSpacing: 'var(--display-letter-spacing)',
                           color: themeColors.textMain,
                         }}
                       >
@@ -553,9 +554,9 @@ export function ReadingComprehensionExercise({ onNavigate, onSignOut, isSidebarC
                     padding: '18px 40px',
                     boxShadow: `0 6px 20px ${themeColors.shadow}`,
                     border: 'none',
-                    fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                    fontSize: '28px',
-                    letterSpacing: '0.12em',
+                    fontFamily: 'var(--display-font-family)',
+                    fontSize: 'calc(var(--display-font-size) * 1.1)',
+                    letterSpacing: 'var(--display-letter-spacing)',
                     cursor: selectedAnswer !== null ? 'pointer' : 'not-allowed',
                     opacity: selectedAnswer !== null ? 1 : 0.5,
                   }}
@@ -573,9 +574,9 @@ export function ReadingComprehensionExercise({ onNavigate, onSignOut, isSidebarC
                     padding: '18px 40px',
                     boxShadow: `0 6px 20px ${themeColors.shadow}`,
                     border: 'none',
-                    fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                    fontSize: '28px',
-                    letterSpacing: '0.12em',
+                    fontFamily: 'var(--display-font-family)',
+                    fontSize: 'calc(var(--display-font-size) * 1.1)',
+                    letterSpacing: 'var(--display-letter-spacing)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

@@ -6,7 +6,7 @@ import { Plus, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from './ThemeContext';
 import { useDisplaySettings } from './DisplaySettingsContext';
-import { api, addToLibrary, fetchReadingById } from '../utils/api';
+import { api, addToLibrary, fetchReadingById, saveReadingProgress } from '../utils/api';
 import { speakText, stopSpeaking, pauseSpeaking, resumeSpeaking } from '../utils/textToSpeech';
 
 interface ReadingPageProps {
@@ -146,25 +146,42 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   const [readingContent, setReadingContent] = useState<string>('');
   const [readingTitle, setReadingTitle] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [currentReadingId, setCurrentReadingId] = useState<string | null>(localStorage.getItem('currentReadingId'));
 
   // NLP States
   const [processedSentences, setProcessedSentences] = useState<string[]>([]);
   const [processedWords, setProcessedWords] = useState<string[][]>([]);
   const [isLoadingNLP, setIsLoadingNLP] = useState(true);
 
+  // Save progress and load reading
+  // Save progress and load reading
   useEffect(() => {
+    if (!currentReadingId) {
+      setReadingContent("Không tìm thấy bài đọc. Vui lòng chọn bài đọc từ danh sách.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    // Save to local storage to sync
+    localStorage.setItem('currentReadingId', currentReadingId);
+
     const loadReading = async () => {
-      const id = localStorage.getItem('currentReadingId');
-      if (!id) {
-        setReadingContent("Không tìm thấy bài đọc. Vui lòng chọn bài đọc từ danh sách.");
-        setLoading(false);
-        return;
+      // Record progress
+      try {
+        await saveReadingProgress(userId, currentReadingId);
+      } catch (err) {
+        console.error("Failed to save progress", err);
       }
 
       try {
-        const data = await fetchReadingById(id);
+        const data = await fetchReadingById(currentReadingId);
         setReadingContent(data.content);
         setReadingTitle(data.title);
+        // Reset state
+        setIsPlaying(false);
+        setIsPaused(false);
+        setCurrentLineIndex(0);
       } catch (error) {
         console.error("Failed to load reading", error);
         setReadingContent("Lỗi khi tải bài đọc.");
@@ -173,8 +190,7 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
       }
     };
     loadReading();
-  }, []);
-
+  }, [currentReadingId, userId]);
   // ---------------- LOAD NLP -----------------
   useEffect(() => {
     if (!readingContent) return;
@@ -236,7 +252,7 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
   const handlePlayWord = async (word: string) => {
     try {
-      await speakText({ text: word, lang: 'vi-VN', rate: 1.0 });
+      await speakText({ text: word });
     } catch {
       toast.error('Không thể phát âm. Vui lòng thử lại.');
     }
@@ -268,9 +284,16 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
     return processedSentences.map((sentence, sIdx) => {
       const words = processedWords[sIdx] || sentence.split(/(\s+)/);
+      const isActive = sIdx === currentLineIndex;
 
       return (
-        <span key={sIdx}>
+        <span
+          key={sIdx}
+          className={`transition-colors duration-300 rounded px-1 ${isActive ? 'bg-yellow-100/50' : ''}`}
+          style={{
+            backgroundColor: isActive ? `${themeColors.accentMain}40` : 'transparent'
+          }}
+        >
           {words.map((segment, wIdx) => {
             const trimmedWord = segment.trim();
 
@@ -334,11 +357,9 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
   // Handle keyboard navigation in Focus Mode
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isFocusMode) return;
-
-      if (event.key === 'Escape') {
-        setIsFocusMode(false);
-      } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+      // Allow navigation in both modes if desired, but user specifically asked for buttons.
+      // Keeping keyboard shortcuts for consistency.
+      if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
         event.preventDefault();
         handlePreviousLine();
       } else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
@@ -349,7 +370,7 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFocusMode, currentLineIndex, processedSentences.length]);
+  }, [currentLineIndex, processedSentences.length]); // Removed isFocusMode dependency to allow general nav
 
   // Handle mouse wheel scrolling in Focus Mode
   useEffect(() => {
@@ -384,9 +405,9 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     if (!isFocusMode) return 1;
     const distance = Math.abs(lineIndex - currentLineIndex);
     if (distance === 0) return 1;
-    if (distance === 1) return 0.15; // Reduced from 0.25
-    if (distance === 2) return 0.05; // Reduced from 0.12
-    return 0.02; // Reduced from 0.08
+    if (distance === 1) return 0.5; // Increased from 0.15 for better visibility
+    if (distance === 2) return 0.25; // Increased from 0.05
+    return 0.1; // Increased from 0.02
   };
 
   // Render text in Focus Mode (line by line)
@@ -437,15 +458,141 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     });
   };
 
+  const calculateSentenceBoundaries = () => {
+    let lastIndex = 0;
+    return processedSentences.map(sentence => {
+      // Find the sentence in the content starting from lastIndex
+      // allowing for some flexibility if needed, but simple search is usually enough 
+      // if processedSentences are substrings.
+      // normalizing whitespace could be safer but let's try direct search first
+      // since fallback is match().
+      const index = readingContent.indexOf(sentence, lastIndex);
+      if (index === -1) {
+        // Fallback: estimate
+        return lastIndex + sentence.length;
+      }
+      const end = index + sentence.length;
+      lastIndex = end;
+      return end;
+    });
+  };
+
+  const restartPlayback = async (startIndex: number) => {
+    stopSpeaking();
+    setIsPlaying(true);
+    setIsPaused(false);
+
+    // Get exact boundaries relative to readingContent
+    const boundaries = calculateSentenceBoundaries();
+
+    // Find start character index for the requested sentence
+    // Previous sentence's end is this sentence's start (approximately, usually works for slice)
+    // Actually, we want the start of the sentence at startIndex.
+    // We can re-find it or derive from boundaries. 
+    // Boundary[i] is END of sentence i.
+    // Start of sentence i is... complicated by gaps?
+    // Let's recalculate starts.
+
+    let playStartCharIndex = 0;
+    if (startIndex > 0) {
+      // Search again to be safe? Or reuse logic.
+      // Let's copy the logic for safety inside here to get the start pos.
+      let scanIdx = 0;
+      for (let i = 0; i < startIndex; i++) {
+        const s = processedSentences[i];
+        const found = readingContent.indexOf(s, scanIdx);
+        if (found !== -1) scanIdx = found + s.length;
+        else scanIdx += s.length; // fallback
+      }
+      // Now scanIdx is at the end of previous sentence. 
+      // The next sentence starts at readingContent.indexOf(target, scanIdx)
+      // But there might be gap. Using readingContent.slice(scanIdx) implies we play the gap too.
+      // That is GOOD. We want to play the gap (silence/breath).
+      playStartCharIndex = scanIdx;
+    }
+
+    const textToSpeak = readingContent.slice(playStartCharIndex);
+
+    // Offset is playStartCharIndex
+    const offsetCharCount = playStartCharIndex;
+    const totalLength = readingContent.length; // Global length
+    let durationRef = 0;
+
+    try {
+      // Heuristic: Punctuation adds pauses, so "time per char" isn't constant.
+      // We assign "weight" to characters to approximate duration.
+      // Adjusted weights: Comma ~ 2 chars, Period ~ 5 chars
+      const getWeightedLength = (text: string) => {
+        let len = 0;
+        for (const char of text) {
+          if (char === '.' || char === '!' || char === '?') len += 5; // Reduced from 12
+          else if (char === ',' || char === ';' || char === ':') len += 2; // Reduced from 6
+          else len += 1;
+        }
+        return len;
+      };
+
+      const mapWeightedToChar = (text: string, targetWeight: number) => {
+        let w = 0;
+        for (let i = 0; i < text.length; i++) {
+          const char = text[i];
+          if (char === '.' || char === '!' || char === '?') w += 5;
+          else if (char === ',' || char === ';' || char === ':') w += 2;
+          else w += 1;
+
+          if (w >= targetWeight) return i;
+        }
+        return text.length - 1;
+      };
+
+      const totalWeightedLength = getWeightedLength(textToSpeak);
+
+      await speakText({
+        text: textToSpeak,
+        onDuration: (duration) => {
+          durationRef = duration;
+        },
+        onTimeUpdate: (currentTime) => {
+          if (durationRef <= 0) return;
+
+          // Local progress in the segment use WEIGHTED length
+          const progress = currentTime / durationRef;
+          const currentWeightedPos = progress * totalWeightedLength;
+
+          const charIndexInSegment = mapWeightedToChar(textToSpeak, currentWeightedPos);
+
+          const globalCharIndex = charIndexInSegment + offsetCharCount;
+
+          const newIndex = boundaries.findIndex(boundary => globalCharIndex <= boundary);
+
+          if (newIndex !== -1 && newIndex !== currentLineIndex) {
+            setCurrentLineIndex((prev) => {
+              if (newIndex < startIndex) return startIndex; // Sanity check
+              if (prev !== newIndex) return newIndex;
+              return prev;
+            });
+          }
+        }
+      });
+    } catch {
+      toast.error('Không thể phát âm. Vui lòng thử lại.');
+      setIsPlaying(false);
+    }
+  };
+
   const handlePreviousLine = () => {
-    if (isFocusMode) {
-      setCurrentLineIndex((prev) => Math.max(0, prev - 1));
+    const newIndex = Math.max(0, currentLineIndex - 1);
+    setCurrentLineIndex(newIndex);
+    if (isPlaying) {
+      restartPlayback(newIndex);
     }
   };
 
   const handleNextLine = () => {
-    if (isFocusMode) {
-      setCurrentLineIndex((prev) => Math.min(processedSentences.length - 1, prev + 1));
+    const newIndex = Math.min(processedSentences.length - 1, currentLineIndex + 1);
+    setCurrentLineIndex(newIndex);
+    if (isPlaying) {
+      restartPlayback(newIndex);
     }
   };
 
@@ -453,15 +600,13 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     if (isPaused) { resumeSpeaking(); setIsPaused(false); return; }
     if (isPlaying) { pauseSpeaking(); setIsPaused(true); return; }
 
-    setIsPlaying(true); setIsPaused(false);
-    try { await speakText({ text: readingContent, lang: 'vi-VN', rate: 1.0 }); }
-    catch { toast.error('Không thể phát âm. Vui lòng thử lại.'); }
-    finally { setIsPlaying(false); setIsPaused(false); }
+    restartPlayback(currentLineIndex);
   };
 
   const handleReset = () => {
     stopSpeaking();
     setIsPlaying(false);
+    setIsPaused(false);
     setCurrentLineIndex(0);
   };
 
@@ -536,7 +681,7 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
             onReset={handleReset}
             isMirrorEnabled={isMirrorEnabled}
             isSyllableMode={isSyllableMode}
-            isPlaying={isPlaying || isPaused}
+            isPlaying={isPlaying && !isPaused}
             isFocusMode={isFocusMode}
           />
         </div>

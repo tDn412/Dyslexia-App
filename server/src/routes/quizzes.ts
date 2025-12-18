@@ -4,18 +4,14 @@ import { supabase } from '../utils/supabaseClient.js';
 export const router = Router();
 
 // GET /api/quizzes - Get all quizzes
+// Get all quizzes
 router.get('/', async (req, res) => {
     const skill = req.query.skill as string;
 
-    let query = supabase.from('Quiz').select('*');
+    let query = supabase.from('exercise_questions').select('*'); // User requested table
 
     if (skill) {
-        query = query.eq('type', skill); // Note: Schema has 'type', previous code used 'skill' or assumed 'skill' was column?
-        // Schema: type text CHECK (type = ANY (ARRAY['listening_dictation', 'phonics_recognition']))
-        // Previous code: query.eq('skill', skill). The provided Schema for Quiz table is: 
-        // quizid, title, type, content, level, createdat
-        // It does NOT have 'skill'. It uses 'type'.
-        // I will assume 'skill' query param maps to 'type' column.
+        query = query.eq('type', skill);
     }
 
     const { data, error } = await query;
@@ -27,9 +23,9 @@ router.get('/', async (req, res) => {
 // GET /api/quizzes/:id - Get quiz by ID
 router.get('/:id', async (req, res) => {
     const { data, error } = await supabase
-        .from('Quiz')
+        .from('exercise_questions')
         .select('*')
-        .eq('quizid', req.params.id)
+        .eq('id', req.params.id) // using 'id' (UUID) instead of 'quizid'
         .single();
 
     if (error) return res.status(404).json({ error: 'Quiz not found' });
@@ -46,9 +42,9 @@ router.post('/submit', async (req, res) => {
 
     // Fetch quiz to calculate score
     const { data: quiz, error: quizError } = await supabase
-        .from('Quiz')
-        .select('content') // Schema has 'content' jsonb, check if it has questions inside
-        .eq('quizid', quizId)
+        .from('exercise_questions')
+        .select('content')
+        .eq('id', quizId) // using 'id'
         .single();
 
     if (quizError || !quiz) return res.status(404).json({ error: 'Quiz not found' });
