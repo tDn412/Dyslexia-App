@@ -27,62 +27,62 @@ export const themes: Record<ThemeType, ThemeColors> = {
   cream: {
     name: 'cream',
     displayName: 'Vàng Kem',
-    appBackground: '#FFF8E7',
-    sidebarBackground: '#FFFCF2',
-    cardBackground: '#FFFCF2',
+    appBackground: '#FFF8E7',           // Màu 1: Nền app
+    sidebarBackground: '#FFF8E7',       // Cùng màu nền app
+    cardBackground: '#FFF4D2',          // Màu 2: Nền văn bản (vàng kem đậm)
     border: '#E8DCC8',
     textMain: '#111111',
     textSecondary: '#333333',
     textMuted: '#666666',
     textLight: '#888888',
-    accentMain: '#FFE8CC',
-    accentHover: '#FFDDB3',
-    exerciseCard1: '#FFF4CC',
-    exerciseCard2: '#FFE9D6',
-    exerciseCard3: '#DFF7E2',
-    exerciseCard4: '#DDEFFF',
+    accentMain: '#FFE8A3',              // Màu 3: Accent nhẹ hơn (vàng pastel)
+    accentHover: '#FFDDA3',
+    exerciseCard1: '#FFF4D2',           // Tất cả exercise card cùng màu với cardBackground
+    exerciseCard2: '#FFF4D2',
+    exerciseCard3: '#FFF4D2',
+    exerciseCard4: '#FFF4D2',
     shadow: 'rgba(0, 0, 0, 0.1)',
-    previewBorder: '#FFEB99',
+    previewBorder: '#FFE8A3',
   },
   light: {
     name: 'light',
     displayName: 'Sáng',
-    appBackground: '#F5F5F0',      // Off-white với chút warm tone → giảm chói
-    sidebarBackground: '#FAFAF7',   // Nhẹ hơn một chút
-    cardBackground: '#FFFFFF',      // Card sáng để nổi bật
-    border: '#D4D0C0',             // Border đậm hơn → dễ phân biệt
-    textMain: '#1A1A1A',           // Text đậm hơn → contrast cao
+    appBackground: '#F5F5F0',           // Màu 1: Nền app
+    sidebarBackground: '#F5F5F0',       // Cùng màu nền app
+    cardBackground: '#FAFAFA',          // Màu 2: Nền văn bản (ivory ấm)
+    border: '#D4D0C0',
+    textMain: '#1A1A1A',
     textSecondary: '#3D3D3D',
     textMuted: '#6B6B6B',
     textLight: '#8C8C8C',
-    accentMain: '#FFC266',         // Màu cam nhẹ → contrast tốt với nền
-    accentHover: '#FFB347',        // Cam đậm khi hover
-    exerciseCard1: '#FFF5CC',
-    exerciseCard2: '#FFE9D6',
-    exerciseCard3: '#E5F7E8',
-    exerciseCard4: '#E3F0FF',
-    shadow: 'rgba(0, 0, 0, 0.08)',  // Shadow rõ hơn một chút
-    previewBorder: '#FFC266',
+    accentMain: '#FFCC80',              // Màu 3: Accent nhẹ hơn (cam pastel)
+    accentHover: '#FFB74D',
+    exerciseCard1: '#FAFAFA',           // Tất cả exercise card cùng màu với cardBackground
+    exerciseCard2: '#FAFAFA',
+    exerciseCard3: '#FAFAFA',
+    exerciseCard4: '#FAFAFA',
+    shadow: 'rgba(0, 0, 0, 0.08)',
+    previewBorder: '#FFCC80',
   },
   coolBlue: {
     name: 'coolBlue',
     displayName: 'Xanh Mát',
-    appBackground: '#E8F1FF',
-    sidebarBackground: '#F3F7FF',
-    cardBackground: '#F3F7FF',
+    appBackground: '#E8F1FF',           // Màu 1: Nền app
+    sidebarBackground: '#E8F1FF',       // Cùng màu nền app
+    cardBackground: '#D1E1FF',          // Màu 2: Nền văn bản (xanh sáng giống Google)
     border: '#C9D6EB',
     textMain: '#101623',
     textSecondary: '#2C384C',
     textMuted: '#52627A',
     textLight: '#7A8AA0',
-    accentMain: '#A8CFFF',
-    accentHover: '#8FC1FF',
-    exerciseCard1: '#DDEFFF',
-    exerciseCard2: '#CDE6FF',
-    exerciseCard3: '#E0F4FF',
-    exerciseCard4: '#D4E7FA',
+    accentMain: '#90CAF9',              // Màu 3: Accent nhẹ hơn (xanh pastel)
+    accentHover: '#64B5F6',
+    exerciseCard1: '#D1E1FF',           // Tất cả exercise card cùng màu với cardBackground
+    exerciseCard2: '#D1E1FF',
+    exerciseCard3: '#D1E1FF',
+    exerciseCard4: '#D1E1FF',
     shadow: 'rgba(0, 0, 50, 0.1)',
-    previewBorder: '#A8CFFF',
+    previewBorder: '#90CAF9',
   },
   dark: {
     name: 'dark',

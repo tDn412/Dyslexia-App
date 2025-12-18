@@ -287,7 +287,7 @@ function AppContent() {
                   color: themeColors.textMain,
                 }}
               >
-                Luyện nói
+                Nói
               </h2>
 
               {/* Sound Wave Visualization */}

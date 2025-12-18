@@ -1,5 +1,5 @@
 const API_URL = 'http://localhost:4000/api';
-const AI_API_URL = 'https://dinhtu4125-dyslexia-backend.hf.space/api';
+const AI_API_URL = 'http://localhost:8000/api';
 
 export interface ApiResponse<T> {
     data?: T;
@@ -57,7 +57,7 @@ export const api = {
     // Text-to-Speech
     tts: {
         speak: (text: string) =>
-            request<{ audio_base64: string }>('/tts', {
+            request<{ audioContent: string }>('/tts', {
                 method: 'POST',
                 body: JSON.stringify({ text }),
             }, AI_API_URL),

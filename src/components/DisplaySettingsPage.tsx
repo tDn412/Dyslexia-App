@@ -120,7 +120,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
             <div
               className="rounded-3xl border-2 shadow-lg p-12 flex items-center justify-center min-h-[160px]"
               style={{
-                backgroundColor: previewTheme.appBackground,
+                backgroundColor: previewTheme.cardBackground,
                 borderColor: previewTheme.previewBorder,
               }}
             >

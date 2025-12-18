@@ -16,8 +16,7 @@ export function ExercisePage({ onNavigate, onSignOut, isSidebarCollapsed = false
     {
       id: 1,
       icon: Image,
-      title: 'Nhìn và Đánh Vần',
-      description: 'Ghép hình ảnh với từ đúng.',
+      title: 'Nhìn và Chọn',
       bgColor: themeColors.exerciseCard1 || '#E3F2FD', // Fallback color if undefined
       onClick: () => {
         if (onNavigate) {
@@ -28,8 +27,8 @@ export function ExercisePage({ onNavigate, onSignOut, isSidebarCollapsed = false
     {
       id: 2,
       icon: Headphones,
-      title: 'Nghe và Gõ',
-      description: 'Gõ những gì bạn nghe.',
+      title: 'Nghe và Điền',
+
       bgColor: themeColors.exerciseCard2 || '#F3E5F5',
       onClick: () => {
         if (onNavigate) {
@@ -41,7 +40,7 @@ export function ExercisePage({ onNavigate, onSignOut, isSidebarCollapsed = false
       id: 3,
       icon: BookCheck,
       title: 'Đọc và Chọn',
-      description: 'Trả lời câu hỏi trắc nghiệm.',
+
       bgColor: themeColors.exerciseCard3 || '#E8F5E9',
       onClick: () => {
         if (onNavigate) {
@@ -52,8 +51,8 @@ export function ExercisePage({ onNavigate, onSignOut, isSidebarCollapsed = false
     {
       id: 4,
       icon: FileText,
-      title: 'Đọc và Điền từ',
-      description: 'Điền vào chỗ trống.',
+      title: 'Đọc và Điền',
+
       bgColor: themeColors.exerciseCard4 || '#FFF3E0',
       onClick: () => {
         if (onNavigate) {
@@ -161,7 +160,7 @@ export function ExercisePage({ onNavigate, onSignOut, isSidebarCollapsed = false
                       opacity: 0.9,
                     }}
                   >
-                    {exercise.description}
+
                   </p>
                 </button>
               );

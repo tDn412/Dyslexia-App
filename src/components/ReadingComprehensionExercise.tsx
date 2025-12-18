@@ -386,210 +386,213 @@ export function ReadingComprehensionExercise({ onNavigate, onSignOut, isSidebarC
           </button>
         </div>
 
-        {/* Split Screen Content */}
-        <div className="flex-1 flex gap-8 px-12 pb-8 overflow-hidden">
-          {/* Left Column - Reading Text */}
-          <div
-            className="flex-1 overflow-auto"
-            style={{
-              backgroundColor: themeColors.cardBackground,
-              border: `3px solid ${themeColors.border}`,
-              borderRadius: '28px',
-              padding: '40px',
-              boxShadow: `0 6px 16px ${themeColors.shadow}`,
-            }}
-          >
-            <h2
-              className="mb-6"
-              style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '32px',
-                lineHeight: '1.3',
-                letterSpacing: '0.14em',
-                color: themeColors.textMain,
-              }}
-            >
-              {selectedExercise.title}
-            </h2>
-            <p
-              style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '26px',
-                lineHeight: '1.8',
-                letterSpacing: '0.14em',
-                color: themeColors.textMain,
-              }}
-            >
-              {selectedExercise.text}
-            </p>
-          </div>
-
-          {/* Right Column - Questions */}
-          <div
-            className="flex-1 flex flex-col"
-            style={{
-              backgroundColor: themeColors.cardBackground,
-              border: `3px solid ${themeColors.border}`,
-              borderRadius: '28px',
-              padding: '40px',
-              boxShadow: `0 6px 16px ${themeColors.shadow}`,
-            }}
-          >
-            {/* Question Number */}
+        {/* Split Screen Content Wrapper */}
+        <div className="flex-1 w-full overflow-hidden flex justify-center px-6 pb-6">
+          {/* Centered Content Container */}
+          <div className="w-full max-w-[1600px] h-full flex gap-6">
+            {/* Left Column - Reading Text */}
             <div
-              className="mb-6"
+              className="flex-[7] overflow-auto"
               style={{
-                fontFamily: "'Lexend', sans-serif",
-                fontSize: '22px',
-                lineHeight: '1.5',
-                letterSpacing: '0.12em',
-                color: themeColors.textSecondary,
+                backgroundColor: themeColors.cardBackground,
+                border: `3px solid ${themeColors.border}`,
+                borderRadius: '28px',
+                padding: '40px',
+                boxShadow: `0 6px 16px ${themeColors.shadow}`,
               }}
             >
-              Câu {currentQuestionIndex + 1}/{selectedExercise.questions.length}
+              <h2
+                className="mb-6"
+                style={{
+                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                  fontSize: '32px',
+                  lineHeight: '1.3',
+                  letterSpacing: '0.14em',
+                  color: themeColors.textMain,
+                }}
+              >
+                {selectedExercise.title}
+              </h2>
+              <p
+                style={{
+                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                  fontSize: '26px',
+                  lineHeight: '1.8',
+                  letterSpacing: '0.14em',
+                  color: themeColors.textMain,
+                }}
+              >
+                {selectedExercise.text}
+              </p>
             </div>
 
-            {/* Question Text */}
-            <h3
-              className="mb-8"
+            {/* Right Column - Questions */}
+            <div
+              className="flex-[3] flex flex-col"
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                fontSize: '28px',
-                fontWeight: '600',
-                lineHeight: '1.4',
-                letterSpacing: '0.12em',
-                color: themeColors.textMain,
+                backgroundColor: themeColors.cardBackground,
+                border: `3px solid ${themeColors.border}`,
+                borderRadius: '28px',
+                padding: '40px',
+                boxShadow: `0 6px 16px ${themeColors.shadow}`,
               }}
             >
-              {currentQuestion.question}
-            </h3>
+              {/* Question Number */}
+              <div
+                className="mb-6"
+                style={{
+                  fontFamily: "'Lexend', sans-serif",
+                  fontSize: '22px',
+                  lineHeight: '1.5',
+                  letterSpacing: '0.12em',
+                  color: themeColors.textSecondary,
+                }}
+              >
+                Câu {currentQuestionIndex + 1}/{selectedExercise.questions.length}
+              </div>
 
-            {/* Answer Options */}
-            <div className="flex-1 flex flex-col gap-4 mb-8">
-              {currentQuestion.options.map((option, index) => {
-                const isSelected = selectedAnswer === index;
-                const isCorrectAnswer = index === currentQuestion.correctAnswer;
+              {/* Question Text */}
+              <h3
+                className="mb-8"
+                style={{
+                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                  fontSize: '28px',
+                  fontWeight: '600',
+                  lineHeight: '1.4',
+                  letterSpacing: '0.12em',
+                  color: themeColors.textMain,
+                }}
+              >
+                {currentQuestion.question}
+              </h3>
 
-                let backgroundColor = themeColors.cardBackground;
-                let borderColor = themeColors.border;
-                let showCheck = false;
+              {/* Answer Options */}
+              <div className="flex-1 flex flex-col gap-4 mb-8">
+                {currentQuestion.options.map((option, index) => {
+                  const isSelected = selectedAnswer === index;
+                  const isCorrectAnswer = index === currentQuestion.correctAnswer;
 
-                if (hasChecked) {
-                  if (isSelected && isCorrect) {
-                    backgroundColor = '#E8F5E9';
-                    borderColor = '#4CAF50';
-                    showCheck = true;
-                  } else if (isSelected && !isCorrect) {
-                    backgroundColor = '#FFE9ED';
-                    borderColor = '#FFC0CB';
-                  } else if (!isSelected && isCorrectAnswer) {
-                    backgroundColor = '#E8F5E9';
-                    borderColor = '#4CAF50';
-                    showCheck = true;
+                  let backgroundColor = themeColors.cardBackground;
+                  let borderColor = themeColors.border;
+                  let showCheck = false;
+
+                  if (hasChecked) {
+                    if (isSelected && isCorrect) {
+                      backgroundColor = '#E8F5E9';
+                      borderColor = '#4CAF50';
+                      showCheck = true;
+                    } else if (isSelected && !isCorrect) {
+                      backgroundColor = '#FFE9ED';
+                      borderColor = '#FFC0CB';
+                    } else if (!isSelected && isCorrectAnswer) {
+                      backgroundColor = '#E8F5E9';
+                      borderColor = '#4CAF50';
+                      showCheck = true;
+                    }
+                  } else if (isSelected) {
+                    backgroundColor = themeColors.accentMain;
                   }
-                } else if (isSelected) {
-                  backgroundColor = themeColors.accentMain;
-                }
 
-                return (
-                  <motion.button
-                    key={index}
-                    onClick={() => handleAnswerSelect(index)}
-                    disabled={hasChecked}
-                    whileHover={!hasChecked ? { scale: 1.02 } : {}}
-                    whileTap={!hasChecked ? { scale: 0.98 } : {}}
-                    className="transition-all duration-200"
-                    style={{
-                      backgroundColor,
-                      border: `3px solid ${borderColor}`,
-                      borderRadius: '20px',
-                      padding: '20px 28px',
-                      textAlign: 'left',
-                      boxShadow: `0 4px 12px ${themeColors.shadow}`,
-                      cursor: hasChecked ? 'default' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <span
+                  return (
+                    <motion.button
+                      key={index}
+                      onClick={() => handleAnswerSelect(index)}
+                      disabled={hasChecked}
+                      whileHover={!hasChecked ? { scale: 1.02 } : {}}
+                      whileTap={!hasChecked ? { scale: 0.98 } : {}}
+                      className="transition-all duration-200"
                       style={{
-                        fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                        fontSize: '24px',
-                        lineHeight: '1.5',
-                        letterSpacing: '0.12em',
-                        color: themeColors.textMain,
+                        backgroundColor,
+                        border: `3px solid ${borderColor}`,
+                        borderRadius: '20px',
+                        padding: '20px 28px',
+                        textAlign: 'left',
+                        boxShadow: `0 4px 12px ${themeColors.shadow}`,
+                        cursor: hasChecked ? 'default' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
                       }}
                     >
-                      {String.fromCharCode(65 + index)}. {option}
-                    </span>
-                    {showCheck && (
-                      <Check
+                      <span
                         style={{
-                          width: '28px',
-                          height: '28px',
-                          color: '#4CAF50',
-                          strokeWidth: '3',
+                          fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                          fontSize: '24px',
+                          lineHeight: '1.5',
+                          letterSpacing: '0.12em',
+                          color: themeColors.textMain,
                         }}
-                      />
-                    )}
-                  </motion.button>
-                );
-              })}
-            </div>
+                      >
+                        {String.fromCharCode(65 + index)}. {option}
+                      </span>
+                      {showCheck && (
+                        <Check
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            color: '#4CAF50',
+                            strokeWidth: '3',
+                          }}
+                        />
+                      )}
+                    </motion.button>
+                  );
+                })}
+              </div>
 
-            {/* Action Button */}
-            {!hasChecked ? (
-              <button
-                onClick={handleCheck}
-                disabled={selectedAnswer === null}
-                className="transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{
-                  backgroundColor: selectedAnswer !== null ? '#4CAF50' : themeColors.border,
-                  color: '#FFFFFF',
-                  borderRadius: '20px',
-                  padding: '18px 40px',
-                  boxShadow: `0 6px 20px ${themeColors.shadow}`,
-                  border: 'none',
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                  fontSize: '28px',
-                  letterSpacing: '0.12em',
-                  cursor: selectedAnswer !== null ? 'pointer' : 'not-allowed',
-                  opacity: selectedAnswer !== null ? 1 : 0.5,
-                }}
-              >
-                Kiểm tra
-              </button>
-            ) : (
-              <button
-                onClick={handleNext}
-                className="transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{
-                  backgroundColor: '#4CAF50',
-                  color: '#FFFFFF',
-                  borderRadius: '20px',
-                  padding: '18px 40px',
-                  boxShadow: `0 6px 20px ${themeColors.shadow}`,
-                  border: 'none',
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                  fontSize: '28px',
-                  letterSpacing: '0.12em',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '12px',
-                }}
-              >
-                <span>Câu tiếp theo</span>
-                <ChevronRight
+              {/* Action Button */}
+              {!hasChecked ? (
+                <button
+                  onClick={handleCheck}
+                  disabled={selectedAnswer === null}
+                  className="transition-all duration-200 hover:scale-105 active:scale-95"
                   style={{
-                    width: '28px',
-                    height: '28px',
-                    strokeWidth: '3',
+                    backgroundColor: selectedAnswer !== null ? '#4CAF50' : themeColors.border,
+                    color: '#FFFFFF',
+                    borderRadius: '20px',
+                    padding: '18px 40px',
+                    boxShadow: `0 6px 20px ${themeColors.shadow}`,
+                    border: 'none',
+                    fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                    fontSize: '28px',
+                    letterSpacing: '0.12em',
+                    cursor: selectedAnswer !== null ? 'pointer' : 'not-allowed',
+                    opacity: selectedAnswer !== null ? 1 : 0.5,
                   }}
-                />
-              </button>
-            )}
+                >
+                  Kiểm tra
+                </button>
+              ) : (
+                <button
+                  onClick={handleNext}
+                  className="transition-all duration-200 hover:scale-105 active:scale-95"
+                  style={{
+                    backgroundColor: '#4CAF50',
+                    color: '#FFFFFF',
+                    borderRadius: '20px',
+                    padding: '18px 40px',
+                    boxShadow: `0 6px 20px ${themeColors.shadow}`,
+                    border: 'none',
+                    fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                    fontSize: '28px',
+                    letterSpacing: '0.12em',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px',
+                  }}
+                >
+                  <span>Câu tiếp theo</span>
+                  <ChevronRight
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      strokeWidth: '3',
+                    }}
+                  />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

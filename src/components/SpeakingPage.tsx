@@ -21,6 +21,7 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
   const [seconds, setSeconds] = useState(0);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const [incorrectWords, setIncorrectWords] = useState<number[]>([]);
+  const [correctWords, setCorrectWords] = useState<number[]>([]);
   const [isQuickSettingsOpen, setIsQuickSettingsOpen] = useState(false);
   const [readingContent, setReadingContent] = useState<string>('');
   const [readingTitle, setReadingTitle] = useState<string>('');
@@ -121,6 +122,18 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
+  const mapToWordUIIndex = (wordIndex: number) => {
+    let realCount = 0;
+    for (let i = 0; i < words.length; i++) {
+      if (words[i].trim() && !/^[.,!?]+$/.test(words[i])) {
+        if (realCount === wordIndex) return i;
+        realCount++;
+      }
+    }
+    return -1;
+  };
+
+
   const handleToggleRecording = async () => {
     if (isRecording) {
       // Stop recording
@@ -146,7 +159,7 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
 
         console.log("Analyze result:", result);
 
-        // ===== So khớp transcript để tìm từ sai =====
+        // ===== So khớp transcript để tìm từ đúng / sai =====
         const normalize = (text: string) =>
           text
             .toLowerCase()
@@ -157,7 +170,7 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
         const expectedWords = normalize(readingContent).split(' ');
         const spokenWords = normalize(transcript).split(' ');
 
-        // map word index (bỏ qua space/punctuation)
+        // Map index từ expectedWords → UI words
         const wordIndexes: number[] = [];
         words.forEach((w, i) => {
           if (w.trim() && !/^[.,!?]+$/.test(w)) {
@@ -166,14 +179,45 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
         });
 
         const wrongWordIndexes: number[] = [];
+        const correctWordIndexes: number[] = [];
 
-        expectedWords.forEach((word, i) => {
-          if (spokenWords[i] !== word && wordIndexes[i] !== undefined) {
-            wrongWordIndexes.push(wordIndexes[i]);
+        let spokenIndex = 0;
+
+        expectedWords.forEach((expectedWord, expectedIndex) => {
+          const uiIndex = wordIndexes[expectedIndex];
+          if (uiIndex === undefined) return;
+
+          if (spokenIndex >= spokenWords.length) {
+            wrongWordIndexes.push(uiIndex);
+            return;
           }
+
+          if (spokenWords[spokenIndex] === expectedWord) {
+            correctWordIndexes.push(uiIndex);
+            spokenIndex++;
+            return;
+          }
+
+          if (
+            spokenIndex + 1 < spokenWords.length &&
+            spokenWords[spokenIndex + 1] === expectedWord
+          ) {
+            correctWordIndexes.push(uiIndex);
+            spokenIndex += 2; // bỏ qua từ thừa
+            return;
+          }
+
+          wrongWordIndexes.push(uiIndex);
+          spokenIndex++;
         });
 
         setIncorrectWords(wrongWordIndexes);
+        setCorrectWords(correctWordIndexes);
+
+
+
+
+
 
       } catch (error) {
         console.error("Analysis failed", error);
@@ -197,26 +241,42 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
   };
 
   const handleReset = () => {
-    setIsRecording(false);
+    // Stop recording safely
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.warn('Recognition already stopped');
+      }
     }
+
+    // Reset states
+    setIsRecording(false);
     setSeconds(0);
     setCurrentWordIndex(-1);
+
     setIncorrectWords([]);
+    setCorrectWords([]);
+
     setTranscript('');
   };
 
+
   // Get background color for a word
   const getWordBackground = (index: number) => {
-    if (index === currentWordIndex) {
-      return '#C9F6C9'; // Soft green for current word
-    }
     if (incorrectWords.includes(index)) {
-      return '#FAD4D4'; // Soft pink for incorrect words
+      return '#FAD4D4'; // đỏ – sai
+    }
+    if (correctWords.includes(index)) {
+      return '#C9F6C9'; // xanh – đúng
+    }
+    if (index === currentWordIndex) {
+      return '#E0F2FE'; // xanh nhạt khi đang đọc
     }
     return 'transparent';
   };
+
 
   const handleQuickSettingsToggle = () => {
     if (!isQuickSettingsOpen && !isSidebarCollapsed) {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Star, Award, Volume2, Lightbulb } from 'lucide-react';
 import { useTheme } from './ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { fetchQuizzes } from '../utils/api';
+import { fetchQuizzes, api } from '../utils/api';
 import { toast } from 'sonner';
 
 interface ListenSpellingExerciseProps {
@@ -228,17 +228,27 @@ export function ListenSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
     setAvailableLetters([...currentQuestion.letterPool]);
   }, [currentQuestionIndex]);
 
-  const playAudio = () => {
+  const playAudio = async () => {
     setIsPlayingAudio(true);
-    // Simulate audio playing (in real app, use Web Speech API or audio file)
-    const utterance = new SpeechSynthesisUtterance(currentQuestion.audioText);
-    utterance.lang = 'vi-VN';
-    utterance.rate = 0.8;
-    window.speechSynthesis.speak(utterance);
-
-    setTimeout(() => {
-      setIsPlayingAudio(false);
-    }, 2000);
+    try {
+      // Use Google Cloud TTS via our backend
+      const response = await api.tts.speak(currentQuestion.audioText);
+      if (response.data && response.data.audioContent) {
+        const audio = new Audio(`data:audio/mp3;base64,${response.data.audioContent}`);
+        audio.play();
+        audio.onended = () => setIsPlayingAudio(false);
+      } else {
+        throw new Error('No audio content received');
+      }
+    } catch (error) {
+      console.error('TTS Error:', error);
+      // Fallback to browser TTS
+      const utterance = new SpeechSynthesisUtterance(currentQuestion.audioText);
+      utterance.lang = 'vi-VN';
+      utterance.rate = 0.8;
+      utterance.onend = () => setIsPlayingAudio(false);
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   const handleLetterClick = (letter: string, index: number) => {

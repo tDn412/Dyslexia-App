@@ -26,16 +26,13 @@ except ImportError:
 app = FastAPI()
 
 # ĐỌC GOOGLE CREDENTIALS TỪ SECRET TRƯỚC KHI KHỞI TẠO CLIENTS
-google_creds_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
-if google_creds_json:
-    creds_path = "/tmp/google_creds.json"
-    with open(creds_path, "w") as f:
-        f.write(google_creds_json)
-    # Đây là dòng quan trọng, set biến môi trường
+# ĐỌC GOOGLE CREDENTIALS TỪ FILE LOCAL
+creds_path = os.path.abspath("google_creds.json")
+if os.path.exists(creds_path):
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path 
-    print("Đã cấu hình Google Credentials.")
+    print(f"Đã cấu hình Google Credentials từ: {creds_path}")
 else:
-    print("CẢNH BÁO: Không tìm thấy secret 'GOOGLE_APPLICATION_CREDENTIALS_JSON'.")
+    print("CẢNH BÁO: Không tìm thấy file 'google_creds.json'.")
 
 
 # === 3. KHỞI TẠO GOOGLE CLIENTS (SAU KHI CÓ CREDENTIALS) ===

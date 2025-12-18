@@ -39,14 +39,14 @@ export function SettingsOverviewPage({ onNavigate, isSidebarCollapsed = false, o
               {/* Display & Text Settings Card */}
               <SettingsCard
                 icon="Ab"
-                title="Cài đặt Hiển thị & Văn bản"
+                title="Hiển thị & Văn bản"
                 onClick={handleDisplaySettingsClick}
               />
 
               {/* Audio & Voice Settings Card */}
               <SettingsCard
                 icon={Volume2}
-                title="Cài đặt Âm thanh & Giọng nói"
+                title="Âm thanh & Giọng nói"
                 onClick={handleAudioSettingsClick}
               />
             </div>

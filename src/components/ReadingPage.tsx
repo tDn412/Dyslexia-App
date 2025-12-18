@@ -380,14 +380,13 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     };
   }, [isFocusMode, currentLineIndex, processedSentences.length]);
 
-  // Calculate opacity for each line in Focus Mode
   const getLineOpacity = (lineIndex: number) => {
     if (!isFocusMode) return 1;
     const distance = Math.abs(lineIndex - currentLineIndex);
     if (distance === 0) return 1;
-    if (distance === 1) return 0.25;
-    if (distance === 2) return 0.12;
-    return 0.08;
+    if (distance === 1) return 0.15; // Reduced from 0.25
+    if (distance === 2) return 0.05; // Reduced from 0.12
+    return 0.02; // Reduced from 0.08
   };
 
   // Render text in Focus Mode (line by line)
