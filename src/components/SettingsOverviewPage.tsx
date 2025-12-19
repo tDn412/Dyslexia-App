@@ -8,9 +8,10 @@ interface SettingsOverviewPageProps {
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onSignOut?: () => void;
+  user?: any;
 }
 
-export function SettingsOverviewPage({ onNavigate, isSidebarCollapsed = false, onToggleCollapse, onSignOut }: SettingsOverviewPageProps) {
+export function SettingsOverviewPage({ onNavigate, isSidebarCollapsed = false, onToggleCollapse, onSignOut, user }: SettingsOverviewPageProps) {
   const { themeColors } = useTheme();
 
   const handleDisplaySettingsClick = () => {
@@ -28,7 +29,7 @@ export function SettingsOverviewPage({ onNavigate, isSidebarCollapsed = false, o
   return (
     <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
       {/* Sidebar */}
-      <Sidebar activePage="Cài đặt" onNavigate={onNavigate} isCollapsed={isSidebarCollapsed} onToggleCollapse={onToggleCollapse} onSignOut={onSignOut} />
+      <Sidebar activePage="Cài đặt" onNavigate={onNavigate} isCollapsed={isSidebarCollapsed} onToggleCollapse={onToggleCollapse} onSignOut={onSignOut} user={user} />
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">

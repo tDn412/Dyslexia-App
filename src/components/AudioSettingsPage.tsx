@@ -14,6 +14,7 @@ interface AudioSettingsPageProps {
   onToggleCollapse?: () => void;
   onSignOut?: () => void;
   userId?: string;
+  user?: any;
 }
 
 const maleVoices = [
@@ -28,7 +29,7 @@ const femaleVoices = [
   { id: 'female-3', label: 'Nữ 3', name: 'Vietnamese Female Voice 3' },
 ];
 
-export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onToggleCollapse, onSignOut, userId = 'dbe2f7eb-4b2f-49d0-a7fa-b6fb5a5a0ab2' }: AudioSettingsPageProps) {
+export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onToggleCollapse, onSignOut, userId = 'dbe2f7eb-4b2f-49d0-a7fa-b6fb5a5a0ab2', user }: AudioSettingsPageProps) {
   const { themeColors } = useTheme();
   const [selectedVoice, setSelectedVoice] = useState('male-1');
   const [readingSpeed, setReadingSpeed] = useState(1.0);
@@ -101,7 +102,7 @@ export function AudioSettingsPage({ onNavigate, isSidebarCollapsed = false, onTo
   return (
     <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
       {/* Sidebar */}
-      <Sidebar activePage="Cài đặt" onNavigate={onNavigate} isCollapsed={isSidebarCollapsed} onToggleCollapse={onToggleCollapse} onSignOut={onSignOut} />
+      <Sidebar activePage="Cài đặt" onNavigate={onNavigate} isCollapsed={isSidebarCollapsed} onToggleCollapse={onToggleCollapse} onSignOut={onSignOut} user={user} />
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden flex flex-col">

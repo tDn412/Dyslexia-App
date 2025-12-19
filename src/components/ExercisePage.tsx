@@ -7,9 +7,10 @@ interface ExercisePageProps {
   onSignOut?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  user?: any;
 }
 
-export function ExercisePage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse }: ExercisePageProps) {
+export function ExercisePage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, user }: ExercisePageProps) {
   const { themeColors } = useTheme();
 
   const exercises = [
@@ -71,6 +72,7 @@ export function ExercisePage({ onNavigate, onSignOut, isSidebarCollapsed = false
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
         onSignOut={onSignOut}
+        user={user}
       />
 
       {/* Main Content */}

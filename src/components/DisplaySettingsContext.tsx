@@ -13,7 +13,7 @@ interface DisplaySettingsContextType extends DisplaySettings {
 }
 
 const DEFAULT_SETTINGS: DisplaySettings = {
-  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+  fontFamily: "'OpenDyslexicRegular', 'Lexend', sans-serif",
   fontSize: 26,
   letterSpacing: 0.14,
   lineSpacing: 1.8,
@@ -80,10 +80,10 @@ export function DisplaySettingsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<DisplaySettingsContextType>(() => ({
-      ...settings,
-      updateSettings,
-      resetSettings,
-    }), [settings, updateSettings, resetSettings]);
+    ...settings,
+    updateSettings,
+    resetSettings,
+  }), [settings, updateSettings, resetSettings]);
 
   return (
     <DisplaySettingsContext.Provider value={value}>

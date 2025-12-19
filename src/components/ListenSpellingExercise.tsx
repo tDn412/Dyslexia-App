@@ -225,6 +225,16 @@ export function ListenSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
             console.log('Processing Item:', quiz);
             let qContent: any = null;
 
+            // Handle stringified JSON content
+            if (typeof quiz.content === 'string') {
+              try {
+                quiz.content = JSON.parse(quiz.content);
+              } catch (e) {
+                console.error('Failed to parse quiz content', e);
+                return;
+              }
+            }
+
             // Normalize content structure
             // If the row 'content' is the question itself (matches DB screenshot)
             if (quiz.content && quiz.content.word) {
@@ -271,10 +281,11 @@ export function ListenSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
 
   // Reset state when question changes
   useEffect(() => {
+    if (!currentQuestion) return;
     const newTotalSlots = currentQuestion.syllables.flat().length;
     setFilledSlots(Array(newTotalSlots).fill(null));
     setAvailableLetters([...currentQuestion.letterPool]);
-  }, [currentQuestionIndex]);
+  }, [currentQuestion]);
 
   const playAudio = async () => {
     setIsPlayingAudio(true);
@@ -388,19 +399,37 @@ export function ListenSpellingExercise({ onNavigate, onSignOut, isSidebarCollaps
     const correctAnswer = currentQuestion.syllables.flat();
     const correctLetter = correctAnswer[firstEmptySlot];
 
-    // Find this letter in available pool
-    const letterIndex = availableLetters.indexOf(correctLetter);
-    if (letterIndex !== -1) {
-      // Fill the slot with correct letter
-      const newFilledSlots = [...filledSlots];
-      newFilledSlots[firstEmptySlot] = correctLetter;
-      setFilledSlots(newFilledSlots);
+    const newFilledSlots = [...filledSlots];
+    let newAvailableLetters = [...availableLetters];
 
-      // Remove letter from available pool
-      const newAvailable = [...availableLetters];
-      newAvailable.splice(letterIndex, 1);
-      setAvailableLetters(newAvailable);
+    // Check if the letter is in the available pool
+    const poolIndex = newAvailableLetters.indexOf(correctLetter);
+
+    if (poolIndex !== -1) {
+      // It's in the pool, move it to the slot
+      newFilledSlots[firstEmptySlot] = correctLetter;
+      newAvailableLetters.splice(poolIndex, 1);
+    } else {
+      // It's not in the pool, so it MUST be in a wrong slot
+      const wrongSlotIndex = filledSlots.findIndex((letter, index) =>
+        letter === correctLetter && index !== firstEmptySlot
+      );
+
+      if (wrongSlotIndex !== -1) {
+        // Remove from wrong slot
+        newFilledSlots[wrongSlotIndex] = null;
+        // Move to correct slot
+        newFilledSlots[firstEmptySlot] = correctLetter;
+        // Available letters remain the same (we just moved it from slot to slot)
+      } else {
+        // Fallback: This shouldn't happen if logic is correct, but just in case
+        // Force add the letter (maybe data mismatch?)
+        newFilledSlots[firstEmptySlot] = correctLetter;
+      }
     }
+
+    setFilledSlots(newFilledSlots);
+    setAvailableLetters(newAvailableLetters);
   };
 
   // Check if all slots are filled

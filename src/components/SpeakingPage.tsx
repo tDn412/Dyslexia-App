@@ -12,9 +12,10 @@ interface SpeakingPageProps {
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
   userId?: string;
+  user?: any;
 }
 
-export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, userId = 'demo-user-id' }: SpeakingPageProps) {
+export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, userId = 'demo-user-id', user }: SpeakingPageProps) {
   const { themeColors } = useTheme();
   const [isRecording, setIsRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -217,6 +218,7 @@ export function SpeakingPage({ onNavigate, onSignOut, isSidebarCollapsed = false
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
         onSignOut={onSignOut}
+        user={user}
       />
 
       <main className="flex-1 overflow-hidden flex flex-col h-screen">

@@ -10,6 +10,7 @@ interface QuizPlayerPageProps {
     onSignOut?: () => void;
     isSidebarCollapsed?: boolean;
     onToggleCollapse?: () => void;
+    user?: any;
 }
 
 interface Question {
@@ -26,7 +27,7 @@ interface Quiz {
     questions: Question[];
 }
 
-export function QuizPlayerPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse }: QuizPlayerPageProps) {
+export function QuizPlayerPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, user }: QuizPlayerPageProps) {
     const { themeColors } = useTheme();
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -152,6 +153,7 @@ export function QuizPlayerPage({ onNavigate, onSignOut, isSidebarCollapsed = fal
                     isCollapsed={isSidebarCollapsed}
                     onToggleCollapse={onToggleCollapse}
                     onSignOut={onSignOut}
+                    user={user}
                 />
                 <main className="flex-1 flex items-center justify-center p-12">
                     <div
@@ -197,6 +199,7 @@ export function QuizPlayerPage({ onNavigate, onSignOut, isSidebarCollapsed = fal
                 isCollapsed={isSidebarCollapsed}
                 onToggleCollapse={onToggleCollapse}
                 onSignOut={onSignOut}
+                user={user}
             />
 
             <main className="flex-1 flex flex-col p-12 overflow-hidden">

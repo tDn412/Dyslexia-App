@@ -11,9 +11,10 @@ interface ReadingSelectionPageProps {
   onSignOut?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  user?: any;
 }
 
-export function ReadingSelectionPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse }: ReadingSelectionPageProps) {
+export function ReadingSelectionPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, user }: ReadingSelectionPageProps) {
   const { themeColors } = useTheme();
   const [selectedLevel, setSelectedLevel] = useState<string>('All');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
@@ -70,6 +71,7 @@ export function ReadingSelectionPage({ onNavigate, onSignOut, isSidebarCollapsed
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
         onSignOut={onSignOut}
+        user={user}
       />
 
       {/* Main Content */}

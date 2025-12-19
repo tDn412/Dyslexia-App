@@ -127,7 +127,8 @@ function AppContent() {
     isSidebarCollapsed,
     onToggleCollapse: () => setIsSidebarCollapsed(!isSidebarCollapsed),
     onSignOut: handleSignOut,
-    userId: user?.id || 'dbe2f7eb-4b2f-49d0-a7fa-b6fb5a5a0ab2' // Use actual UUID from Supabase
+    userId: user?.id || 'dbe2f7eb-4b2f-49d0-a7fa-b6fb5a5a0ab2', // Use actual UUID from Supabase
+    user: user
   };
 
   if (currentPage === 'ReadingSelection') {
@@ -250,7 +251,11 @@ function AppContent() {
               </h2>
 
               {/* Content Box */}
-              <div className="rounded-[27px] border-2 p-6 flex-1 flex flex-col justify-between" style={{ backgroundColor: themeColors.exerciseCard1, borderColor: themeColors.border }}>
+              <div
+                className="rounded-[27px] border-2 p-6 flex-1 flex flex-col justify-between cursor-pointer hover:opacity-95 transition-all"
+                style={{ backgroundColor: themeColors.exerciseCard1, borderColor: themeColors.border }}
+                onClick={() => setCurrentPage(recentReading?.materialId ? 'Reading' : 'ReadingSelection')}
+              >
                 <p
                   className="mb-4"
                   style={{
@@ -268,7 +273,6 @@ function AppContent() {
                   {recentReading?.preview || "Hãy chọn một bài đọc từ danh sách để bắt đầu."}
                 </p>
                 <button
-                  onClick={() => setCurrentPage(recentReading?.materialId ? 'Reading' : 'ReadingSelection')}
                   className="flex items-center gap-3 hover:opacity-70 transition-colors"
                   style={{
                     fontFamily: 'var(--display-font-family)',

@@ -117,7 +117,7 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
-            className="fixed left-20 top-6 z-50 w-10 h-10 border-2 rounded-full flex items-center justify-center transition-colors shadow-md"
+            className="fixed left-20 top-6 z-50 w-14 h-14 border-2 rounded-full flex items-center justify-center transition-colors shadow-md"
             style={{
               backgroundColor: themeColors.cardBackground,
               borderColor: themeColors.border,
@@ -130,7 +130,7 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
             }}
             title="Mở rộng thanh điều hướng"
           >
-            <ChevronRight className="w-5 h-5" style={{ color: themeColors.textMain }} />
+            <ChevronRight className="w-8 h-8" style={{ color: themeColors.textMain }} />
           </button>
         )}
       </>
@@ -144,14 +144,14 @@ export function Sidebar({ activePage, onNavigate, isCollapsed = false, onToggleC
       {onToggleCollapse && (
         <button
           onClick={onToggleCollapse}
-          className="absolute top-6 right-4 z-10 w-10 h-10 border-2 rounded-full flex items-center justify-center hover:opacity-80 transition-colors"
+          className="absolute top-6 right-4 z-10 w-14 h-14 border-2 rounded-full flex items-center justify-center hover:opacity-80 transition-colors"
           style={{
             backgroundColor: themeColors.accentMain,
             borderColor: themeColors.border,
           }}
           title="Thu gọn thanh điều hướng"
         >
-          <ChevronLeft className="w-5 h-5" style={{ color: themeColors.textMain }} />
+          <ChevronLeft className="w-8 h-8" style={{ color: themeColors.textMain }} />
         </button>
       )}
 

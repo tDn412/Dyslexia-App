@@ -15,6 +15,7 @@ interface OCRImportPageProps {
   onToggleCollapse?: () => void;
   onSignOut?: () => void;
   userId?: string;
+  user?: any;
 }
 
 interface ReadingFile {
@@ -23,7 +24,7 @@ interface ReadingFile {
   dateAdded: string;
 }
 
-export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggleCollapse, onSignOut, userId = 'demo-user-id' }: OCRImportPageProps) {
+export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggleCollapse, onSignOut, userId = 'demo-user-id', user }: OCRImportPageProps) {
   const { themeColors } = useTheme();
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -378,6 +379,7 @@ export function OCRImportPage({ onNavigate, isSidebarCollapsed = false, onToggle
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
         onSignOut={onSignOut}
+        user={user}
       />
 
       {/* Main Content */}

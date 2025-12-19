@@ -13,6 +13,7 @@ interface LibraryPageProps {
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
   userId?: string;
+  user?: any;
 }
 
 interface Word {
@@ -21,7 +22,7 @@ interface Word {
   dateAdded: Date;
 }
 
-export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, userId = 'demo-user-id' }: LibraryPageProps) {
+export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, userId = 'demo-user-id', user }: LibraryPageProps) {
   const { themeColors } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
@@ -209,6 +210,7 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
         onSignOut={onSignOut}
+        user={user}
       />
 
       {/* Main Content */}
@@ -350,7 +352,7 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         </div>
 
         {/* Alphabet Filter - Fixed on Right Side with Scroll and Gradients */}
-        <div className="fixed right-4 top-[10%] bottom-[15%] w-[70px] z-10 flex flex-col">
+        <div className="fixed right-4 top-[10%] bottom-[15%] w-[90px] z-10 flex flex-col">
           {/* Top Gradient Fade */}
           <div
             className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-20"
@@ -368,7 +370,7 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
               WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 64px, black calc(100% - 64px), transparent)',
             }}
           >
-            <div className="flex flex-col gap-2 items-center px-1">
+            <div className="flex flex-col gap-3 items-center px-1">
               {alphabet.map((letter) => (
                 <button
                   key={letter}
@@ -377,8 +379,8 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
                   style={{
                     backgroundColor: selectedLetter === letter ? themeColors.accentMain : themeColors.cardBackground,
                     borderColor: themeColors.border,
-                    width: selectedLetter === letter ? '56px' : '50px',
-                    height: selectedLetter === letter ? '56px' : '50px',
+                    width: selectedLetter === letter ? '64px' : '58px',
+                    height: selectedLetter === letter ? '64px' : '58px',
                     boxShadow: selectedLetter === letter ? '0 4px 6px -1px rgba(0,0,0,0.1)' : '0 1px 3px 0 rgba(0,0,0,0.1)',
                   }}
                   aria-label={`Lọc từ bắt đầu bằng ${letter}`}
@@ -386,7 +388,7 @@ export function LibraryPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
                   <p
                     style={{
                       fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
-                      fontSize: selectedLetter === letter ? '24px' : '22px',
+                      fontSize: selectedLetter === letter ? '28px' : '24px',
                       letterSpacing: '0.02em',
                       fontWeight: selectedLetter === letter ? '600' : '400',
                       color: themeColors.textMain,

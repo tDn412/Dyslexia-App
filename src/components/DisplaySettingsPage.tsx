@@ -14,16 +14,17 @@ interface DisplaySettingsPageProps {
   onToggleCollapse?: () => void;
   onSignOut?: () => void;
   userId?: string;
+  user?: any;
 }
 
 const fontOptions = [
   { name: 'Arial', value: 'Arial, sans-serif' },
   { name: 'Lexend', value: "'Lexend', sans-serif" },
-  { name: 'OpenDyslexic', value: "'OpenDyslexic', 'Lexend', sans-serif" },
+  { name: 'OpenDyslexic', value: "'OpenDyslexicRegular', 'Lexend', sans-serif" },
   { name: 'Verdana', value: 'Verdana, sans-serif' },
 ];
 
-export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, onToggleCollapse, onSignOut, userId = 'demo-user-id' }: DisplaySettingsPageProps) {
+export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, onToggleCollapse, onSignOut, userId = 'demo-user-id', user }: DisplaySettingsPageProps) {
   const { currentTheme, themeColors, setTheme } = useTheme();
   const { fontFamily, fontSize: savedFontSize, letterSpacing: savedLetterSpacing, lineSpacing: savedLineSpacing, updateSettings } = useDisplaySettings();
   const [selectedFont, setSelectedFont] = useState(fontFamily);
@@ -87,7 +88,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
   return (
     <div className="flex h-screen" style={{ backgroundColor: themeColors.appBackground }}>
       {/* Sidebar */}
-      <Sidebar activePage="Cài đặt" onNavigate={onNavigate} isCollapsed={isSidebarCollapsed} onToggleCollapse={onToggleCollapse} onSignOut={onSignOut} />
+      <Sidebar activePage="Cài đặt" onNavigate={onNavigate} isCollapsed={isSidebarCollapsed} onToggleCollapse={onToggleCollapse} onSignOut={onSignOut} user={user} />
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
@@ -107,7 +108,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
             </button>
             <h1
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                fontFamily: "'OpenDyslexicRegular', 'Lexend', sans-serif",
                 color: themeColors.textMain,
               }}
             >
@@ -143,7 +144,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
             <label
               className="block mb-5"
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                fontFamily: "'OpenDyslexicRegular', 'Lexend', sans-serif",
                 fontSize: '28px',
                 letterSpacing: '0.02em',
                 color: themeColors.textMain,
@@ -177,7 +178,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
               <label
                 className="w-48 flex-shrink-0"
                 style={{
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                  fontFamily: "'OpenDyslexicRegular', 'Lexend', sans-serif",
                   fontSize: '28px',
                   letterSpacing: '0.02em',
                   color: themeColors.textMain,
@@ -204,7 +205,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
                 step={0.5}
                 className="w-24 text-center border-2 rounded-xl h-11"
                 style={{
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                  fontFamily: "'OpenDyslexicRegular', 'Lexend', sans-serif",
                   fontSize: '20px',
                   backgroundColor: themeColors.appBackground,
                   borderColor: themeColors.border,
@@ -220,7 +221,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
               <label
                 className="w-48 flex-shrink-0"
                 style={{
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                  fontFamily: "'OpenDyslexicRegular', 'Lexend', sans-serif",
                   fontSize: '28px',
                   letterSpacing: '0.02em',
                   color: themeColors.textMain,
@@ -247,7 +248,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
                 step={0.5}
                 className="w-24 text-center border-2 rounded-xl h-11"
                 style={{
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                  fontFamily: "'OpenDyslexicRegular', 'Lexend', sans-serif",
                   fontSize: '20px',
                   backgroundColor: themeColors.appBackground,
                   borderColor: themeColors.border,
@@ -263,7 +264,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
               <label
                 className="w-48 flex-shrink-0"
                 style={{
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                  fontFamily: "'OpenDyslexicRegular', 'Lexend', sans-serif",
                   fontSize: '28px',
                   letterSpacing: '0.02em',
                   color: themeColors.textMain,
@@ -290,7 +291,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
                 step={0.05}
                 className="w-24 text-center border-2 rounded-xl h-11"
                 style={{
-                  fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                  fontFamily: "'OpenDyslexicRegular', 'Lexend', sans-serif",
                   fontSize: '20px',
                   backgroundColor: themeColors.appBackground,
                   borderColor: themeColors.border,
@@ -305,7 +306,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
             <label
               className="block mb-5"
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                fontFamily: "'OpenDyslexicRegular', 'Lexend', sans-serif",
                 fontSize: '28px',
                 letterSpacing: '0.02em',
                 color: themeColors.textMain,
@@ -349,7 +350,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
                     key={`name-${themeKey}`}
                     className="w-16 text-center"
                     style={{
-                      fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                      fontFamily: "'OpenDyslexicRegular', 'Lexend', sans-serif",
                       fontSize: '16px',
                       color: themeColors.textSecondary,
                     }}
@@ -367,7 +368,7 @@ export function DisplaySettingsPage({ onNavigate, isSidebarCollapsed = false, on
               onClick={handleSave}
               className="px-12 py-4 rounded-2xl border-2 shadow-md hover:shadow-lg transition-all flex items-center gap-4 hover:opacity-90"
               style={{
-                fontFamily: "'OpenDyslexic', 'Lexend', sans-serif",
+                fontFamily: "'OpenDyslexicRegular', 'Lexend', sans-serif",
                 fontSize: '24px',
                 letterSpacing: '0.02em',
                 backgroundColor: themeColors.accentMain,

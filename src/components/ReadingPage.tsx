@@ -125,7 +125,7 @@ function ContextualToolbar({ word, position, onClose, onAddToLibrary, onToggleBo
   );
 }
 
-export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, userId = 'demo-user-id' }: ReadingPageProps) {
+export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, userId = 'demo-user-id', user }: ReadingPageProps & { user?: any }) {
   const { themeColors } = useTheme();
   const { fontFamily, fontSize, letterSpacing, lineSpacing: lineHeight } = useDisplaySettings();
   const [isMirrorEnabled, setIsMirrorEnabled] = useState(false);
@@ -405,9 +405,9 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
     if (!isFocusMode) return 1;
     const distance = Math.abs(lineIndex - currentLineIndex);
     if (distance === 0) return 1;
-    if (distance === 1) return 0.5; // Increased from 0.15 for better visibility
-    if (distance === 2) return 0.25; // Increased from 0.05
-    return 0.1; // Increased from 0.02
+    if (distance === 1) return 0.2; // Reduced from 0.5
+    if (distance === 2) return 0.1; // Reduced from 0.25
+    return 0.05; // Reduced from 0.1
   };
 
   // Render text in Focus Mode (line by line)
@@ -618,9 +618,8 @@ export function ReadingPage({ onNavigate, onSignOut, isSidebarCollapsed = false,
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
         onSignOut={onSignOut}
-      />
-
-      <main className="flex-1 overflow-hidden flex flex-col h-screen">
+        user={user}
+      /><main className="flex-1 overflow-hidden flex flex-col h-screen">
         <div className="flex-1 flex items-center justify-center px-12 pt-8 pb-4 overflow-hidden">
           <div
             ref={readingBoxRef}

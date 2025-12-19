@@ -11,9 +11,10 @@ interface SpeakingSelectionPageProps {
   onSignOut?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  user?: any;
 }
 
-export function SpeakingSelectionPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse }: SpeakingSelectionPageProps) {
+export function SpeakingSelectionPage({ onNavigate, onSignOut, isSidebarCollapsed = false, onToggleCollapse, user }: SpeakingSelectionPageProps) {
   const { themeColors } = useTheme();
   const [selectedLevel, setSelectedLevel] = useState<string>('All');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
@@ -75,6 +76,7 @@ export function SpeakingSelectionPage({ onNavigate, onSignOut, isSidebarCollapse
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
         onSignOut={onSignOut}
+        user={user}
       />
 
       {/* Main Content */}
